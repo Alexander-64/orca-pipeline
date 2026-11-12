@@ -1,0 +1,62 @@
+{
+  "manifestVersion": 2,
+  "id": "agent-pipeline",
+  "name": "Agent Pipeline",
+  "version": "0.1.0",
+  "description": "Visual agent DAG planner with Orca execution, Beads tracking and quota-aware failover.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "agent-pipeline",
+        "title": "Agent Pipeline",
+        "icon": "blocks",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "settings": [
+      {
+        "key": "beadsExecutable",
+        "title": "Beads CLI executable",
+        "description": "Path or command name of bd on the coordinator host.",
+        "type": "string",
+        "default": "bd",
+        "maxLength": 1024
+      },
+      {
+        "key": "pollIntervalMs",
+        "title": "Run polling interval (ms)",
+        "description": "How often the coordinator refreshes Orca Task state.",
+        "type": "integer",
+        "default": 2500,
+        "minimum": 500,
+        "maximum": 60000
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "agent:read"
+    },
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "settings:own"
+    },
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "terminal:send"
+    }
+  ],
+  "publisher": "alexander-64",
+  "license": "MIT"
+}
