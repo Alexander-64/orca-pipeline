@@ -6,7 +6,21 @@ An Orca plugin for agent DAG workflows: a planner produces YAML, Orca executes R
 
 Publisher: [Alexander-64 on GitHub](https://github.com/Alexander-64). License: [MIT](LICENSE).
 
-The manifest uses `publisher: "alexander-64"`, the required lowercase kebab-case form of GitHub owner `Alexander-64`, and `license: "MIT"`.
+Version **0.1.1** uses manifest v2, `id: "agent-pipeline"` and `license: "MIT"`. The deprecated `publisher` field is removed: Orca derives the owner from GitHub, giving the install key `alexander-64.agent-pipeline`. A local folder without publisher uses `local.agent-pipeline`.
+
+## Install from a tag
+
+Once the 0.1.1 tag is published:
+
+```sh
+orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
+```
+
+Requires **Orca 1.4.248+** and its `orca` CLI. Orca pins the tag's exact commit. This executable plugin requires approval: review the access and, if you agree, run the command Orca returns with `--approve <fingerprint>`. A `trusted-worker` is a separate Node process with full user access to files, networking and external programs. Capabilities control Orca API calls; they do not sandbox that process.
+
+Requested capabilities: `agent:read` discovers agents; `workspace:read` lists workspaces; `terminal:send` creates coordinator terminals; `storage:own` persists plans, Runs and the journal; `settings:own` reads plugin settings. One Agent Pipeline panel contains four internal views.
+
+Install/configure `bd` on the coordinator host and initialize Beads in the target repository (`bd init`). Set its command or absolute path in Settings → Plugins → Agent Pipeline → Beads CLI executable; the board reports unavailable bd. Configure external agent CLIs and their accounts in Orca on each execution host. Live quota reading needs `codex app-server`; PR operations need authenticated `gh` on the coordinator host. These CLIs and credentials are not bundled. Node.js 22+ and `npm ci` are development requirements, not tag-install steps.
 
 ## Features and UI
 
@@ -34,7 +48,7 @@ npm run check
 npm run validate
 ```
 
-`npm ci` installs the locked development dependencies. `plugin types` generates the ignored `.orca/types` required by tsconfig. `typecheck` checks TypeScript; `test` runs the Node release-content test and Orca plugin tests; `check` renders the panel and its UI scenarios; `validate` checks the source manifest. Tests/check run trusted local code. For interactive development:
+`npm ci` installs the locked development dependencies. `plugin types` generates the ignored `.orca/types` required by tsconfig. `typecheck` checks TypeScript; `test` runs Orca plugin tests; `test:release` separately runs the Node packaging tests; `check` renders the panel and its UI scenarios; `validate` checks the source manifest. Tests/check run trusted local code. For interactive development:
 
 ```sh
 orca plugin dev watch . --check --shot .orca/shots --json
@@ -99,8 +113,10 @@ The dependency-free Node builder executes no shell commands. It copies an explic
 
 ## GitHub and Orca Community publication
 
-The official Community route is a **public GitHub repository** with a **manifest v2 `orca-plugin.json` at its root**. `publisher` must identify the repository owner; Orca requires lowercase kebab-case, so owner `Alexander-64` is written as `alexander-64` in the manifest. A root **LICENSE** is required; this project uses MIT and retains the separate upstream YAML license. Publish **no binaries, archives or symlinks**. Orca loads TS/TSX sources directly.
+The official Community route is a **public GitHub repository** with a **manifest v2 `orca-plugin.json` at its root**. Omit `publisher`: with `engines.orca >=1.4.248`, Orca derives the owner from the GitHub repository. A root **LICENSE** is required; this project uses MIT and retains the separate upstream YAML license. Publish **no binaries, archives or symlinks**. Orca loads TS/TSX sources directly.
 
-The confirmed repository is `https://github.com/Alexander-64/orca-pipeline`. Review the files and diff, and run all checks above. Keep the manifest at the repository root, not only under dist. Align manifest/package versions, add the **`orca-plugin` topic**, then create and push the **`v0.1.0` tag** matching this version. Check indexing at `https://www.onorca.dev/plugins/Alexander-64/orca-pipeline`. **No PR to `stablyai/orca-plugins` is required for Community.** Local validation does not imply Community indexing has completed.
+The confirmed repository is `https://github.com/Alexander-64/orca-pipeline`. Review the files and diff, and run all checks above. Keep the manifest at the repository root, not only under dist. Align manifest/package versions, add the **`orca-plugin` topic**, then create and push the **`v0.1.1` tag** matching this version. Check indexing at `https://orca.dev/plugins/alexander-64/orca-pipeline`. **No PR to `stablyai/orca-plugins` is required for Community.** Local validation does not imply Community indexing has completed.
 
-Once published, users can run `orca plugin install Alexander-64/orca-pipeline@vX.Y.Z --json`. Executable plugins require user approval of the access listed by Orca. `private: true` in package.json prevents accidental npm publication and does not prevent GitHub/Community distribution. These instructions do not create a repository, commit, push, tag or publish anything.
+Once published, users can run `orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json`. Executable plugins require user approval of the access listed by Orca. `private: true` in package.json prevents accidental npm publication and does not prevent GitHub/Community distribution. These instructions do not create a repository, commit, push, tag or publish anything.
+
+References: [Orca authoring guide](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-authoring.md), [manifest](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-manifest.md), [listing](https://orca.dev/plugins/add) and [catalog policy](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-listing-policy.md).

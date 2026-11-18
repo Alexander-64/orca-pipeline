@@ -4,7 +4,51 @@ import * as fs from 'node:fs/promises'
 import { cp, mkdir, writeFile, mkdtemp, readFile, readdir, lstat, rm, symlink, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { buildRelease, root } from './build-release.mjs'
+
+const exec = promisify(execFile)
+const yamlRoundTrip = "import {parse,stringify} from './vendor/yaml/index.js'; import assert from 'node:assert/strict'; assert.deepEqual(parse(stringify({steps:[1]})),{steps:[1]})"
+
+// A working-tree copy hides ignored or untracked dependencies. Reconstruct only
+// Git's inventory, including staged additions, without installing dependencies.
+async function copyGitFiles(projectRoot, destination) {
+  const { stdout } = await exec('git', ['ls-files', '-z'], { cwd: projectRoot })
+  for (const name of stdout.split('\0').filter(Boolean)) {
+    const target = path.join(destination, name)
+    await mkdir(path.dirname(target), { recursive: true })
+    await cp(path.join(projectRoot, name), target)
+  }
+}
+
+test('Git source inventory builds a release with a working YAML runtime', async t => {
+  const temp = await mkdtemp(path.join(await realpath(tmpdir()), 'release-git-source-'))
+  t.after(() => rm(temp, { recursive: true, force: true }))
+  const source = path.join(temp, 'source')
+  await copyGitFiles(root, source)
+  const result = await buildRelease(path.join(temp, 'release'), { projectRoot: source })
+  await exec(process.execPath, ['--input-type=module', '-e', yamlRoundTrip], { cwd: result.output })
+})
+
+test('Git inventory exposes ignored YAML dependencies even when local import works', async t => {
+  const temp = await mkdtemp(path.join(await realpath(tmpdir()), 'release-ignored-runtime-'))
+  t.after(() => rm(temp, { recursive: true, force: true }))
+  const source = path.join(temp, 'source')
+  await mkdir(source)
+  await cp(path.join(root, 'vendor'), path.join(source, 'vendor'), { recursive: true })
+  await writeFile(path.join(source, 'package.json'), '{"type":"module"}\n')
+  await writeFile(path.join(source, '.gitignore'), 'dist/\n')
+  await exec('git', ['init', '--quiet'], { cwd: source })
+  await exec('git', ['add', '.'], { cwd: source })
+  await exec(process.execPath, ['--input-type=module', '-e', yamlRoundTrip], { cwd: source })
+  const snapshot = path.join(temp, 'snapshot')
+  await copyGitFiles(source, snapshot)
+  await assert.rejects(
+    exec(process.execPath, ['--input-type=module', '-e', yamlRoundTrip], { cwd: snapshot }),
+    error => /ERR_MODULE_NOT_FOUND/.test(error.stderr) && /vendor\/yaml\/dist\/index.js/.test(error.stderr),
+  )
+})
 
 test('release is complete, byte-identical, source-only and does not overwrite', async () => {
   const temp = await mkdtemp(path.join(await realpath(tmpdir()), 'agent-pipeline-release-'))

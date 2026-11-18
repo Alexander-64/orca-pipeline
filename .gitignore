@@ -3,7 +3,7 @@ node_modules/
 .beads-smoke-*/
 .artifact-smoke-*/
 .agent-pipeline/
-dist/
+/dist/
 .release-smoke/
 .release-*/
 coverage/

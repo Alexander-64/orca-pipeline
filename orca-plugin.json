@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "agent-pipeline",
   "name": "Agent Pipeline",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Visual agent DAG planner with Orca execution, Beads tracking and quota-aware failover.",
   "engines": {
     "orca": ">=1.4.248"
@@ -57,6 +57,5 @@
       "kind": "terminal:send"
     }
   ],
-  "publisher": "alexander-64",
   "license": "MIT"
 }
