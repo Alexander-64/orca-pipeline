@@ -1,4 +1,7 @@
 import { defineCheck } from 'orca/testing'
+import { simulateFailover } from '../examples/failover/simulation'
+import { fixtureWorkspace } from './coordinatorFixture'
+import { metricsForRuns } from './metrics'
 import { demoDashboard, demoRun, parallelDraft } from './testData'
 
 export default defineCheck({
@@ -20,6 +23,17 @@ export default defineCheck({
       'dashboard.get': () => ({ ...demoDashboard, runs: [demoRun] })
     },
     persisted: { plugin: { 'pipeline.tab': 'runs', 'pipeline.run': demoRun.id, 'pipeline.step': 'build' } }
+  },
+  failover: {
+    requests: {
+      'dashboard.get': async () => {
+        const { run } = await simulateFailover()
+        return JSON.parse(JSON.stringify({
+          ...demoDashboard, workspaces: [fixtureWorkspace], runs: [run], metrics: metricsForRuns([run])
+        }))
+      }
+    },
+    persisted: { plugin: { 'pipeline.tab': 'runs', 'pipeline.step': 'build' } }
   },
   beads: {
     requests: {

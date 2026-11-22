@@ -8,6 +8,7 @@ import { Planner } from './planner'
 import { metricsForRuns } from './metrics'
 import { GhPrClient } from './pr'
 import { StorageMutationJournal } from './mutations'
+import { listScenarios, openScenario, saveScenario } from './scenarioFiles'
 import { parseScenario } from './scenario'
 import { CodexUsageReader } from './usage'
 import type { Bead, Dashboard, PipelineRun, PlannerRun, Workspace } from './types'
@@ -90,6 +91,18 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('dashboard.get', async ({ workspaceId }) => {
     await initialized
     return dashboard(workspaceId)
+  })
+  async function fileWorkspace(id: string): Promise<Workspace> {
+    const workspace = (await workspaces()).find(item => item.id === id)
+    if (!workspace) throw new Error('Select an available workspace.')
+    return workspace
+  }
+
+  orca.panels.handle('scenario.files', async ({ workspaceId }) => ({ names: await listScenarios(await fileWorkspace(workspaceId)) }))
+  orca.panels.handle('scenario.open', async ({ workspaceId, name }) => ({ source: await openScenario(await fileWorkspace(workspaceId), name) }))
+  orca.panels.handle('scenario.save', async ({ workspaceId, name, source, previous }) => {
+    await saveScenario(await fileWorkspace(workspaceId), name, source, previous)
+    return { saved: true }
   })
   orca.panels.handle('scenario.validate', async ({ source }) => json({ scenario: parseScenario(source) }))
   orca.panels.handle('beads.action', async ({ workspaceId, id, action }) => {

@@ -50,6 +50,11 @@ const appliedPlans = atom<string[]>('pipeline.applied-plans', [], { persist: 'pl
 const scenarioName = atom('')
 const scenarioObjective = atom('')
 const plan = atom<PlannerRun | null>(null)
+const runScenario = atom<Scenario | null>(null)
+const fileName = atom('')
+const fileNames = atom<string[] | null>(null)
+const openedFile = atom<{ workspaceId: string; name: string; source: string } | null>(null)
+const fileStatus = atom('')
 const validated = atom<Scenario | null>(null)
 const editorSelection = atom('')
 const inspector = atom<Scenario['steps'][number] | null>(null)
@@ -86,8 +91,9 @@ function selectNode(id: string): void {
 
 function syncDraft(source: string): void {
   set(draft, source)
+  set(fileStatus, '')
   try {
-    parseScenario(source)
+    set(runScenario, parseScenario(source))
     const scenario = parseScenario(source, { expandEvidence: false })
     set(validated, scenario)
     set(scenarioName, scenario.name)
@@ -95,6 +101,7 @@ function syncDraft(source: string): void {
     set(draftError, null)
     selectNode(scenario.steps.some(step => step.id === read(editorSelection)) ? read(editorSelection) : scenario.steps[0].id)
   } catch (value) {
+    set(runScenario, null)
     set(draftError, message(value))
   }
 }
@@ -308,6 +315,77 @@ function GraphEditor() {
   </Stack>
 }
 
+function RepositoryFiles() {
+  const id = read(workspaceId)
+  const name = read(fileName)
+  const names = read(fileNames)
+  const selected = read(data)?.workspaces.find(item => item.id === id)
+  if (!selected) return null
+  if (selected.hostId && selected.hostId !== 'local') return <Collapsible title="Repository scenarios">
+    <Text>To open or save a YAML file, select a workspace on the coordinator host.</Text>
+  </Collapsible>
+  return <Collapsible title="Repository scenarios">
+    <Stack gap="sm">
+      <Button disabled={read(busy)} onPress={() => action(async () => {
+        const result = await plugin.request('scenario.files', { workspaceId: id })
+        if (id === read(workspaceId)) set(fileNames, result.names)
+      })}>Browse pipelines/</Button>
+      {names?.length ? <Select label="Repository file" value={names.includes(name) ? name : ''} placeholder="Choose a YAML file"
+        options={names.map(value => ({ value, label: value }))} onChange={value => { set(fileName, value); set(fileStatus, '') }} /> : null}
+      {names?.length === 0 ? <Text muted>No YAML files in pipelines/ yet.</Text> : null}
+      <Input label="Filename in pipelines/" value={name} placeholder="release.yaml" onChange={value => { set(fileName, value); set(fileStatus, '') }} />
+      <Row gap="xs">
+        <Button disabled={!name || read(busy)} onPress={() => action(async () => {
+          const before = read(draft)
+          const { source } = await plugin.request('scenario.open', { workspaceId: id, name })
+          if (id !== read(workspaceId) || name !== read(fileName)) return
+          if (before !== read(draft)) throw new Error('The draft changed while opening the file. Open it again to replace the draft.')
+          syncDraft(source)
+          set(openedFile, { workspaceId: id, name, source })
+          set(template, 'custom')
+          set(fileStatus, 'Opened pipelines/' + name)
+        })}>Open file</Button>
+        <Button disabled={!name || read(busy) || !!read(draftError)} onPress={() => action(async () => {
+          const source = read(draft)
+          const opened = read(openedFile)
+          const previous = opened?.workspaceId === id && opened.name === name ? opened.source : null
+          await plugin.request('scenario.save', { workspaceId: id, name, source, previous })
+          if (id !== read(workspaceId)) return
+          set(openedFile, { workspaceId: id, name, source })
+          if (names) set(fileNames, [...new Set([...names, name])].sort())
+          set(fileStatus, 'Saved pipelines/' + name)
+        })}>Save file</Button>
+      </Row>
+      {read(fileStatus) ? <Text size="sm">{read(fileStatus)}</Text> : null}
+    </Stack>
+  </Collapsible>
+}
+
+function RunPreview() {
+  const scenario = read(runScenario)
+  const workspace = read(data)?.workspaces.find(item => item.id === read(workspaceId))
+  if (!scenario || !workspace) return null
+  return <Collapsible title="Run preview">
+    <Stack gap="sm">
+      <Text muted>Agents are listed in preference order. Available quota at dispatch can change the selection.</Text>
+      {waves(scenario.steps).map((wave, index) => <Stack gap="xs">
+        <Heading level={3}>{'Wave ' + (index + 1)}</Heading>
+        {wave.map(step => <Card title={step.title} description={step.id}>
+          <KeyValue items={[
+            { label: 'Agent order', value: [step.agent, ...step.fallback].join(' → ') },
+            { label: 'Host', value: step.placement.host },
+            { label: 'Worktree', value: step.placement.worktree === 'current' ? workspace.path : [step.placement.repo, step.placement.worktree, step.placement.name].filter(Boolean).join(' · ') },
+            ...(step.model ? [{ label: 'Model', value: [step.model, step.effort].filter(Boolean).join(' · ') }] : []),
+            ...(step.approval ? [{ label: 'Approval', value: step.approval }] : [])
+          ]} />
+          <CodeView code={step.acceptance.join('\n')} wrap />
+        </Card>)}
+      </Stack>)}
+      {scenario.pullRequest ? <Text>{'Pull request into ' + scenario.pullRequest.base + (scenario.pullRequest.merge ? ' · merge approval: ' + scenario.pullRequest.mergeApproval : '')}</Text> : null}
+    </Stack>
+  </Collapsible>
+}
+
 function ScenarioView() {
   const dashboard = read(data)
   const disabled = read(busy) || !dashboard?.workspaces.length
@@ -325,6 +403,10 @@ function ScenarioView() {
           placeholder="Select a workspace"
           onChange={(value) => {
             set(workspaceId, value)
+            set(fileName, '')
+            set(fileNames, null)
+            set(openedFile, null)
+            set(fileStatus, '')
             set(plan, null)
             void refresh(value)
           }}
@@ -346,6 +428,8 @@ function ScenarioView() {
           }}
         />
       </Grid>
+      <RepositoryFiles />
+      <RunPreview />
       <Row gap="sm" wrap>
         <Button
           variant="outline"

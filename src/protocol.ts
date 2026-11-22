@@ -5,6 +5,9 @@ export {}
 declare module 'orca' {
   interface PluginRequests {
     'dashboard.get': { input: { workspaceId?: string }; output: Dashboard }
+    'scenario.files': { input: { workspaceId: string }; output: { names: string[] } }
+    'scenario.open': { input: { workspaceId: string; name: string }; output: { source: string } }
+    'scenario.save': { input: { workspaceId: string; name: string; source: string; previous: string | null }; output: { saved: boolean } }
     'scenario.validate': { input: { source: string }; output: { scenario: Scenario } }
     'beads.action': { input: { workspaceId: string; id: string; action: 'claim' | 'close' | 'reopen' }; output: Dashboard }
     'plan.start': { input: { workspaceId: string; objective: string; agent: string }; output: { plan: PlannerRun } }

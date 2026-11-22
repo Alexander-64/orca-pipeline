@@ -1,0 +1,125 @@
+# Import this file in Agent Pipeline from the workspace containing the committed
+# release candidate. Prepare pins that workspace's HEAD and derives the tag
+# from the version in the committed manifests. Use a fresh Run for a new candidate.
+name: release
+objective: Publish a verified Agent Pipeline commit to Orca Community after human approval
+maxConcurrent: 1
+steps:
+  - id: prepare
+    title: Prepare the release candidate
+    agent: codex
+    maxAttempts: 1
+    spec: |
+      From the current workspace, require a clean Git status and record the full commit
+      SHA of HEAD. Confirm the intended GitHub destination is Alexander-64/orca-pipeline.
+      Create a disposable detached Git worktree at that SHA under a fresh physical
+      temporary directory. Run the install, tests and release build there. Set RELEASE_DIR
+      to a new path next to the detached checkout inside the same temporary directory.
+      Use Node.js 22+ and Orca 1.4.248+. Confirm the root manifest is v2 and that
+      orca-plugin.json, package.json and package-lock.json agree on the release version.
+      Derive the exact tag vX.Y.Z from that version. Record the SHA, tag, version,
+      repository, release inventory count and SHA-256 of its sorted relative file list,
+      Orca release-entry content hash and actual check results in worker_done so later
+      workers can read them from this Run.
+      Remove only the temporary worktree and output you created once checks are complete.
+      Keep publication and repository settings untouched during preparation.
+    acceptance:
+      - git status --porcelain=v1 --untracked-files=all
+      - git rev-parse --verify HEAD
+      - npm ci
+      - orca plugin types . --json
+      - npm run typecheck
+      - npm test
+      - npm run test:release
+      - npm run check
+      - npm run validate
+      - npm run build:release -- --out "$RELEASE_DIR"
+      - orca plugin validate "$RELEASE_DIR" --json
+      - orca plugin release-entry . --json
+
+  - id: review
+    title: Independently review the release candidate
+    needs: [prepare]
+    agent: claude
+    maxAttempts: 1
+    spec: |
+      Read the completed preparation task result in the current Orca Run
+      (orca orchestration task-list --run <run-id> --full --json). Use its exact SHA, tag
+      and repository. Set RELEASE_TAG to that tag. Missing or inconsistent evidence
+      blocks the review.
+      Create a fresh disposable detached worktree at that SHA, confirm the checkout,
+      and rerun the full preparation acceptance sequence with a new RELEASE_DIR.
+      Compare the SHA, versions, tag, content hash and inventory to preparation.
+      Review the diff from the previous published release and inspect the committed
+      tree and installable files for secrets, symlinks, binaries, archives, generated
+      artifacts and compliance with the documented Orca Community requirements.
+      Read the public GitHub repository metadata (web, API or gh) and remote tag. A private, archived or forked
+      destination, or a tag pointing elsewhere, blocks release. Document an absent
+      or already-present orca-plugin topic and the tag state for the publisher.
+      Clean up your temporary worktree and output. Include SHIP, FIX-FIRST or BLOCKED
+      with concrete evidence, destination, full SHA, exact tag, version and content
+      hash in worker_done. Report success only for SHIP and report failure otherwise.
+      Keep source, tags and repository settings untouched during review.
+    acceptance:
+      - git status --porcelain=v1 --untracked-files=all
+      - git rev-parse --verify HEAD
+      - npm ci
+      - orca plugin types . --json
+      - npm run typecheck
+      - npm test
+      - npm run test:release
+      - npm run check
+      - npm run validate
+      - npm run build:release -- --out "$RELEASE_DIR"
+      - orca plugin validate "$RELEASE_DIR" --json
+      - orca plugin release-entry . --json
+      - git ls-remote https://github.com/Alexander-64/orca-pipeline.git "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}"
+
+  - id: publish
+    title: Publish the approved GitHub tag
+    needs: [review]
+    agent: codex
+    maxAttempts: 1
+    approval: |
+      Review the preparation and SHIP results in this Run. Approve only if you
+      authorize publishing that exact SHA and tag to Alexander-64/orca-pipeline
+      and adding the orca-plugin topic if needed. Reject if any detail is unclear.
+    spec: |
+      Confirm the publish gate's approval using orca orchestration gate-list with
+      this Run and task IDs. Read the preparation and review results via task-list
+      for this Run. Set RELEASE_TAG to the approved tag. Require matching SHA, tag,
+      version, repository and content hash, plus a SHIP decision. Verify the pinned
+      commit's root manifest and versions with Git. Check that the destination is
+      public, unarchived and not a fork, and confirm the remote tag state before
+      any remote mutation. Use the explicit GitHub destination
+      https://github.com/Alexander-64/orca-pipeline.git. An existing remote tag
+      is acceptable only when it resolves to the approved SHA. Peel annotated tags. Stop on
+      any mismatch, missing evidence or unknown remote state.
+      If the remote tag is absent, push only the approved commit to the exact
+      tag ref using git push <destination> <approved-sha>:refs/tags/<approved-tag>,
+      with neither force nor a branch ref. This creates a lightweight tag at the
+      pinned commit. Verify the remote tag after the push. Add the orca-plugin topic
+      with gh repo edit Alexander-64/orca-pipeline --add-topic orca-plugin only if
+      missing, and verify that the repository remains public and the topic is set.
+      If a write has an ambiguous result, read the remote state before doing anything
+      else. Report the exact SHA, tag and observed GitHub state in worker_done.
+    acceptance:
+      - git ls-remote https://github.com/Alexander-64/orca-pipeline.git "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}"
+
+  - id: verify
+    title: Verify GitHub and Orca Community
+    needs: [publish]
+    agent: codex
+    maxAttempts: 1
+    spec: |
+      Read the pin and the publication result from this Run. Set RELEASE_TAG to
+      the approved tag. Verify public GitHub access, the orca-plugin topic, the exact
+      tag's full resolved commit and the root manifest version at that commit. For annotated tags, compare the peeled commit.
+      Open https://orca.dev/plugins/alexander-64/orca-pipeline and verify that the
+      Community listing shows the approved version and links to that commit. Report
+      URLs and observed version and commit in worker_done. Allow up to one hour for
+      indexing, checking at reasonable intervals during that window. If still pending,
+      rejected, mismatched or unavailable, report failure with the last observed status.
+      Keep verification read-only.
+    acceptance:
+      - git ls-remote https://github.com/Alexander-64/orca-pipeline.git "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}"

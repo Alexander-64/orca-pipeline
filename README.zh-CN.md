@@ -6,14 +6,14 @@
 
 发布者：[GitHub 上的 Alexander-64](https://github.com/Alexander-64)。许可证：[MIT](LICENSE)。
 
-**0.1.1** 使用 manifest v2、`id: "agent-pipeline"` 和 `license: "MIT"`。已移除弃用的 `publisher` 字段：Orca 从 GitHub 仓库所有者推导发布者，安装键为 `alexander-64.agent-pipeline`。未声明 publisher 的本地文件夹使用 `local.agent-pipeline`。
+**0.1.2** 使用 manifest v2、`id: "agent-pipeline"` 和 `license: "MIT"`。已移除弃用的 `publisher` 字段：Orca 从 GitHub 仓库所有者推导发布者，安装键为 `alexander-64.agent-pipeline`。未声明 publisher 的本地文件夹使用 `local.agent-pipeline`。
 
 ## 从标签安装
 
-0.1.1 标签发布后执行：
+0.1.2 标签发布后执行：
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
+orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
 ```
 
 需要 **Orca 1.4.248+** 及其 `orca` CLI。Orca 固定到标签的准确 commit。可执行插件需要审批：检查权限，同意后执行 Orca 返回的带 `--approve <fingerprint>` 的命令。`trusted-worker` 是独立的 Node 进程，以用户身份完整访问文件、网络和外部程序；capabilities 限制 Orca API 调用，并不隔离 Node 进程。
@@ -21,6 +21,14 @@ orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
 权限用途：`agent:read` 发现智能体，`workspace:read` 列出工作区，`terminal:send` 创建协调器终端，`storage:own` 保存计划、Run 和日志，`settings:own` 读取插件设置。一个 Agent Pipeline 面板包含四个内部视图。
 
 在协调器主机安装并配置 `bd`，在目标仓库初始化 Beads（`bd init`）。在 Settings → Plugins → Agent Pipeline → Beads CLI executable 设置命令或绝对路径；bd 不可用时看板显示错误。在每个执行主机的 Orca 中配置外部智能体 CLI 和账户。实时配额读取需要 `codex app-server`，PR 操作需要协调器主机上已登录的 `gh`。插件不包含这些 CLI 或凭据。Node.js 22+ 和 `npm ci` 用于开发，从标签安装无需这些步骤。
+
+## 使用仓库中的场景
+
+在 **Scenario** 标签页选择协调器主机上的工作区。打开 **Repository scenarios → Browse pipelines/**，选择并打开 YAML 文件。**Save file** 将当前草稿保存到该工作区的 `pipelines/` 目录。要更新已有文件，请先打开它。如果磁盘上的文件已更改，请重新打开。
+
+启动前展开 **Run preview**，可查看依赖顺序、首选与备用智能体、主机、工作树、人工审批、独立审查和验收命令。系统在派发步骤时根据当时的配额选择智能体。
+
+仓库包含需要人工批准的[发布场景](pipelines/release.yaml)以及可复现的[配额故障转移演示](examples/failover/README.md)。
 
 ## 功能与界面
 
@@ -110,14 +118,14 @@ orca plugin validate .release-smoke --json
 
 最后一条命令验证实际发布目录，不安装或发布插件。`npm run build:release` 会用新构建替换默认的 `dist/agent-pipeline`，清除过时及仅用于开发的文件。构建先写入同级临时目录，替换失败时恢复原构建。`--out <path>` 指定其他目录，相对路径基于项目根目录；该目录必须尚不存在，只有标准的 `dist/agent-pipeline` 允许替换。如果默认目录正在用于已安装的插件或活动 Run，请改用新的 `--out`。
 
-构建器仅使用 Node.js 内置模块，不执行 shell，也不增加依赖。它复制明确列出的生产模块、manifest、三个 README、存在时的根 LICENSE，以及包含上游许可证的 `vendor/yaml`。它校验相对导入与入口，拒绝符号链接、二进制内容和已知凭据模式。测试、fixtures、UI check 场景、包管理文件、node_modules、`.orca`、`.agent-pipeline`、日志、source map 及其他开发产物不会进入发布包。新增生产模块需显式加入 `scripts/build-release.mjs`。发布前仍须人工检查敏感信息，模式扫描无法保证发现所有秘密。`npm run test:release` 单独检查文件清单、与源文件逐字节一致，以及覆盖/符号链接防护。
+构建器仅使用 Node.js 内置模块，不执行 shell，也不增加依赖。它复制明确列出的生产模块、manifest、三个 README、存在时的根 LICENSE，以及包含上游许可证的 `vendor/yaml`。它校验相对导入与入口，验证 manifest 中声明的 PNG，拒绝符号链接、其他二进制内容和已知凭据模式。测试、fixtures、UI check 场景、包管理文件、node_modules、`.orca`、`.agent-pipeline`、日志、source map 及其他开发产物不会进入发布包。新增生产模块需显式加入 `scripts/build-release.mjs`。发布前仍须人工检查敏感信息，模式扫描无法保证发现所有秘密。`npm run test:release` 单独检查文件清单、与源文件逐字节一致，以及覆盖/符号链接防护。
 
 ## GitHub 与 Orca Community 发布
 
-官方 Community 路径是一个**公开 GitHub 仓库**，仓库根目录必须有 **manifest v2 的 `orca-plugin.json`**。不声明 `publisher`：在 `engines.orca >=1.4.248` 下，Orca 从 GitHub 仓库推导所有者。根目录必须包含 **LICENSE**；项目使用 MIT，并保留 YAML 独立的上游许可证。发布树中**不得包含 binaries、archives 或 symlinks**。Orca 直接加载 TS/TSX 源代码。
+官方 Community 路径是一个**公开 GitHub 仓库**，仓库根目录必须有 **manifest v2 的 `orca-plugin.json`**。不声明 `publisher`：在 `engines.orca >=1.4.248` 下，Orca 从 GitHub 仓库推导所有者。根目录必须包含 **LICENSE**；项目使用 MIT，并保留 YAML 独立的上游许可证。发布树可包含声明的 PNG 截图，禁止包含可执行文件、原生模块、归档文件和符号链接。Orca 直接加载 TS/TSX 源代码。
 
-已确认的仓库为 `https://github.com/Alexander-64/orca-pipeline`。检查文件及差异，运行上述完整验证。Manifest 必须位于仓库根目录，不能仅存在于 dist 中。保持 manifest/package 版本一致，为仓库添加 **`orca-plugin` topic**，再创建并推送对应版本的 **`v0.1.1` tag**。在 `https://orca.dev/plugins/alexander-64/orca-pipeline` 查看收录状态。**Community 不需要向 `stablyai/orca-plugins` 提交 PR。** 本地验证成功不代表 Community 已完成收录。
+已确认的仓库为 `https://github.com/Alexander-64/orca-pipeline`。检查文件及差异，运行上述完整验证。Manifest 必须位于仓库根目录，不能仅存在于 dist 中。保持 manifest/package 版本一致，为仓库添加 **`orca-plugin` topic**，再创建并推送对应版本的 **`v0.1.2` tag**。在 `https://orca.dev/plugins/alexander-64/orca-pipeline` 查看收录状态。**Community 不需要向 `stablyai/orca-plugins` 提交 PR。** 本地验证成功不代表 Community 已完成收录。
 
-发布后，用户可执行 `orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json`。可执行插件需要用户批准 Orca 列出的权限。package.json 中的 `private: true` 防止误发到 npm，不妨碍 GitHub/Community 分发。本说明不会创建仓库、commit、push、tag 或执行发布。
+发布后，用户可执行 `orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json`。可执行插件需要用户批准 Orca 列出的权限。package.json 中的 `private: true` 防止误发到 npm，不妨碍 GitHub/Community 分发。本说明不会创建仓库、commit、push、tag 或执行发布。
 
 官方参考：[Orca 开发指南](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-authoring.md)、[manifest](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-manifest.md)、[收录说明](https://orca.dev/plugins/add) 和 [目录政策](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-listing-policy.md)。

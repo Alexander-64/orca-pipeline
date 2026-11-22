@@ -6,14 +6,14 @@ Publisher: [Alexander-64 на GitHub](https://github.com/Alexander-64). Лице
 
 Orca-плагин для агентных DAG-сценариев: planner составляет YAML, Orca исполняет шаги через Run/Task/Dispatch, Beads показывает задачи, а coordinator переключает подтверждённо упавший по quota шаг на следующего агента с continuation checkpoint.
 
-Версия **0.1.1** использует manifest v2, `id: "agent-pipeline"` и `license: "MIT"`. Deprecated-поле `publisher` удалено: Orca получает владельца из GitHub, поэтому ключ установки — `alexander-64.agent-pipeline`. Локальная папка без publisher получает ключ `local.agent-pipeline`.
+Версия **0.1.2** использует manifest v2, `id: "agent-pipeline"` и `license: "MIT"`. Deprecated-поле `publisher` удалено: Orca получает владельца из GitHub, поэтому ключ установки — `alexander-64.agent-pipeline`. Локальная папка без publisher получает ключ `local.agent-pipeline`.
 
 ## Установка из тега
 
-После публикации тега 0.1.1:
+После публикации тега 0.1.2:
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
+orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
 ```
 
 Нужны Orca **1.4.248+** и доступный `orca` CLI. Orca закрепляет точный commit тега. Исполняемый плагин требует approval: просмотрите доступ и выполните возвращённую Orca команду с `--approve <fingerprint>`, если согласны. `trusted-worker` — отдельный Node-процесс с полным доступом от имени пользователя: файлы, сеть и внешние программы. Capabilities ограничивают вызовы Orca API, но не изолируют Node-процесс.
@@ -21,6 +21,14 @@ orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
 Разрешения: `agent:read` для списка агентов, `workspace:read` для workspaces, `terminal:send` для создания coordinator terminals, `storage:own` для сохранения планов/Runs/journal, `settings:own` для настроек. У плагина одна панель Agent Pipeline с четырьмя внутренними представлениями.
 
 На coordinator host установите и настройте `bd`, инициализируйте Beads в целевом репозитории (`bd init`). Задайте команду или абсолютный путь в Settings → Plugins → Agent Pipeline → Beads CLI executable; при недоступном bd доска показывает ошибку. Внешние агентные CLI и их авторизацию настройте в Orca на каждом host выполнения. Для live quota нужен `codex app-server`, для PR workflow — авторизованный `gh` на coordinator host. Эти CLI и учётные записи не входят в плагин. Node.js 22+ и `npm ci` нужны для разработки, установка из тега их не требует.
+
+## Сценарии в репозитории
+
+На вкладке **Scenario** выберите workspace на машине координатора. Откройте **Repository scenarios → Browse pipelines/** и выберите YAML. **Save file** сохраняет черновик в `pipelines/`. Чтобы обновить существующий файл, сначала откройте его. Если файл изменили на диске, панель предложит открыть его заново.
+
+В **Run preview** до запуска видны зависимости, основной и запасные агенты, host, worktree, подтверждения, независимая проверка и команды приёмки. Агент выбирается с учётом квоты при запуске шага.
+
+В репозитории есть [сценарий релиза](pipelines/release.yaml) с подтверждением перед публикацией и [пример переключения агента](examples/failover/README.md) с имитацией исчерпания квоты.
 
 ## Возможности
 
@@ -124,14 +132,14 @@ orca plugin validate .release-smoke --json
 
 `npm run build:release` по умолчанию заменяет `dist/agent-pipeline` свежей сборкой без устаревших или dev-файлов. Сборка готовится во временном соседнем каталоге; при ошибке замены предыдущая сборка восстанавливается. `--out <path>` выбирает другой каталог (относительно корня проекта), который должен быть новым: перезапись разрешена только для стандартного `dist/agent-pipeline`. Не запускайте стандартную сборку, пока этот каталог обслуживает установленный плагин или активный Run; используйте новый `--out`.
 
-Сборщик на Node.js не вызывает shell и не требует новых зависимостей. Он копирует явный список production-модулей, manifest, три README, корневой LICENSE при наличии и `vendor/yaml` с upstream-лицензией. Проверяет относительные импорты и точки входа, отвергает symlinks, бинарные данные и известные шаблоны секретов. Tests, fixtures, UI check-сценарии, package manager files, node_modules, `.orca`, `.agent-pipeline`, logs, карты исходников и dev artifacts в поставку не входят. Новые production-модули нужно явно внести в `scripts/build-release.mjs`. Проверка шаблонов не заменяет ручной просмотр содержимого перед публикацией. `npm run test:release` отдельно проверяет состав, побайтовое совпадение с исходниками и защиту от перезаписи/symlinks.
+Сборщик на Node.js не вызывает shell и не требует новых зависимостей. Он копирует явный список production-модулей, manifest, три README, корневой LICENSE при наличии и `vendor/yaml` с upstream-лицензией. Проверяет относительные импорты и точки входа, проверяет PNG из manifest, отвергает symlinks, прочие бинарные данные и известные шаблоны секретов. Tests, fixtures, UI check-сценарии, package manager files, node_modules, `.orca`, `.agent-pipeline`, logs, карты исходников и dev artifacts в поставку не входят. Новые production-модули нужно явно внести в `scripts/build-release.mjs`. Проверка шаблонов не заменяет ручной просмотр содержимого перед публикацией. `npm run test:release` отдельно проверяет состав, побайтовое совпадение с исходниками и защиту от перезаписи/symlinks.
 
 ## GitHub и Orca Community
 
-Официальный Community-путь — публичный GitHub-репозиторий с `orca-plugin.json` manifest v2 в корне. `publisher` не указывается: при `engines.orca >=1.4.248` Orca определяет владельца по GitHub-репозиторию. В корне обязателен LICENSE; проект использует MIT, YAML сохраняет собственный `vendor/yaml/LICENSE`. В публикуемом дереве не должно быть binaries, archives или symlinks. Исходные `.ts`/`.tsx` Orca загружает напрямую; отдельный бинарный bundle не нужен.
+Официальный Community-путь — публичный GitHub-репозиторий с `orca-plugin.json` manifest v2 в корне. `publisher` не указывается: при `engines.orca >=1.4.248` Orca определяет владельца по GitHub-репозиторию. В корне обязателен LICENSE; проект использует MIT, YAML сохраняет собственный `vendor/yaml/LICENSE`. В публикуемом дереве разрешены заявленные PNG, запрещены исполняемые файлы, нативные модули, архивы и символьные ссылки. Исходные `.ts`/`.tsx` Orca загружает напрямую; отдельный бинарный bundle не нужен.
 
-Подтверждённый репозиторий: `https://github.com/Alexander-64/orca-pipeline`. Просмотрите diff и файлы, выполните проверки выше. Manifest должен оставаться в корне repo, а не только внутри dist. Сохраните совпадающую версию в manifest/package metadata, добавьте topic `orca-plugin`, создайте и отправьте tag `v0.1.1` для этой версии. Статус индексации: `https://orca.dev/plugins/alexander-64/orca-pipeline`. PR в `stablyai/orca-plugins` для Community **не нужен**. Локальная валидация сама по себе не означает, что Community уже проиндексировал релиз.
+Подтверждённый репозиторий: `https://github.com/Alexander-64/orca-pipeline`. Просмотрите diff и файлы, выполните проверки выше. Manifest должен оставаться в корне repo, а не только внутри dist. Сохраните совпадающую версию в manifest/package metadata, добавьте topic `orca-plugin`, создайте и отправьте tag `v0.1.2` для этой версии. Статус индексации: `https://orca.dev/plugins/alexander-64/orca-pipeline`. PR в `stablyai/orca-plugins` для Community **не нужен**. Локальная валидация сама по себе не означает, что Community уже проиндексировал релиз.
 
-После публикации установка пользователем: `orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json`. Для исполняемого плагина Orca возвращает запрос approval с перечнем доступа; подтверждение выполняет пользователь. `private: true` в package.json предотвращает случайный npm publish и не мешает GitHub/Community. Эта инструкция не выполняет создание repo, commit, push, tag или публикацию.
+После публикации установка пользователем: `orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json`. Для исполняемого плагина Orca возвращает запрос approval с перечнем доступа; подтверждение выполняет пользователь. `private: true` в package.json предотвращает случайный npm publish и не мешает GitHub/Community. Эта инструкция не выполняет создание repo, commit, push, tag или публикацию.
 
 Правила: [руководство Orca](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-authoring.md), [manifest](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-manifest.md), [листинг](https://orca.dev/plugins/add) и [политика каталога](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-listing-policy.md).

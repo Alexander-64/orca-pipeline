@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assert, test } from 'orca/testing'
 import { BeadsClient } from './beads'
@@ -7,9 +8,11 @@ import { parseScenario } from './scenario'
 import type { PipelineRun, PipelineTask } from './types'
 
 test('creates, lists, updates and closes a real Beads issue', async () => {
-  const directory = await mkdtemp(join(process.cwd(), '.beads-smoke-'))
+  const directory = await mkdtemp(join(tmpdir(), 'agent-pipeline-beads-'))
   const executable = join(process.cwd(), 'node_modules', '.bin', 'bd')
   try {
+    const repository = await defaultRunner('git', ['init', '--quiet', '--template='], directory)
+    assert.equal(repository.code, 0, repository.stderr)
     const initialized = await defaultRunner(executable, ['init', '--prefix', 'ap', '--quiet', '--stealth', '--skip-agents', '--skip-hooks'], directory)
     assert.equal(initialized.code, 0, initialized.stderr)
     const client = new BeadsClient(directory, defaultRunner, executable)

@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "agent-pipeline",
   "name": "Agent Pipeline",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Visual agent DAG planner with Orca execution, Beads tracking and quota-aware failover.",
   "engines": {
     "orca": ">=1.4.248"
@@ -55,6 +55,18 @@
     },
     {
       "kind": "terminal:send"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "assets/pipeline-planner.png",
+      "alt": "Agent Pipeline in Orca with the visual DAG and YAML editor side by side.",
+      "caption": "Plan a pipeline with parallel steps and an independent Evidence Gate."
+    },
+    {
+      "path": "assets/quota-failover.png",
+      "alt": "Completed simulated run in Orca showing a failed Codex quota attempt, a completed Claude retry and a completed Kimi Evidence Gate.",
+      "caption": "Simulated quota failover followed by independent review."
     }
   ],
   "license": "MIT"

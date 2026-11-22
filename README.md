@@ -6,14 +6,14 @@ An Orca plugin for agent DAG workflows: a planner produces YAML, Orca executes R
 
 Publisher: [Alexander-64 on GitHub](https://github.com/Alexander-64). License: [MIT](LICENSE).
 
-Version **0.1.1** uses manifest v2, `id: "agent-pipeline"` and `license: "MIT"`. The deprecated `publisher` field is removed: Orca derives the owner from GitHub, giving the install key `alexander-64.agent-pipeline`. A local folder without publisher uses `local.agent-pipeline`.
+Version **0.1.2** uses manifest v2, `id: "agent-pipeline"` and `license: "MIT"`. The deprecated `publisher` field is removed: Orca derives the owner from GitHub, giving the install key `alexander-64.agent-pipeline`. A local folder without publisher uses `local.agent-pipeline`.
 
 ## Install from a tag
 
-Once the 0.1.1 tag is published:
+Once the 0.1.2 tag is published:
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json
+orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
 ```
 
 Requires **Orca 1.4.248+** and its `orca` CLI. Orca pins the tag's exact commit. This executable plugin requires approval: review the access and, if you agree, run the command Orca returns with `--approve <fingerprint>`. A `trusted-worker` is a separate Node process with full user access to files, networking and external programs. Capabilities control Orca API calls; they do not sandbox that process.
@@ -21,6 +21,14 @@ Requires **Orca 1.4.248+** and its `orca` CLI. Orca pins the tag's exact commit.
 Requested capabilities: `agent:read` discovers agents; `workspace:read` lists workspaces; `terminal:send` creates coordinator terminals; `storage:own` persists plans, Runs and the journal; `settings:own` reads plugin settings. One Agent Pipeline panel contains four internal views.
 
 Install/configure `bd` on the coordinator host and initialize Beads in the target repository (`bd init`). Set its command or absolute path in Settings → Plugins → Agent Pipeline → Beads CLI executable; the board reports unavailable bd. Configure external agent CLIs and their accounts in Orca on each execution host. Live quota reading needs `codex app-server`; PR operations need authenticated `gh` on the coordinator host. These CLIs and credentials are not bundled. Node.js 22+ and `npm ci` are development requirements, not tag-install steps.
+
+## Run a versioned scenario
+
+In the **Scenario** tab, select a workspace on the coordinator host. Open **Repository scenarios**, choose **Browse pipelines/** and open a YAML file. **Save file** writes the current draft under the displayed filename in that workspace’s `pipelines/` directory. Open an existing file before editing it. If someone changes it on disk, saving asks you to reopen it.
+
+Expand **Run preview** before pressing **Start** to see the dependency waves, preferred and fallback agents, host, worktree, human approvals, independent review steps and acceptance commands. Quota is evaluated when the worker is dispatched.
+
+This repository includes a [release scenario](pipelines/release.yaml) for publishing a verified Git tag after human approval. To try failover without consuming a provider quota, follow the [simulated failover demo](examples/failover/README.md).
 
 ## Features and UI
 
@@ -110,14 +118,14 @@ orca plugin validate .release-smoke --json
 
 This validates the actual release directory without installing or publishing it. `npm run build:release` replaces the default `dist/agent-pipeline` with a fresh build, removing stale and dev-only files. It stages in a sibling temporary directory and restores the previous build if replacement fails. `--out <path>` selects another location, relative to the project root if not absolute; it must be new, since only the standard `dist/agent-pipeline` may be replaced. While that directory serves a live installation or active Run, use a fresh `--out` instead.
 
-The dependency-free Node builder executes no shell commands. It copies an explicit production module inventory, manifest, all three READMEs, root LICENSE when present, and `vendor/yaml` including its license. It verifies relative imports and entry points and rejects symlinks, binary content and recognizable credential patterns. Tests, fixtures, UI check scenarios, package manager files, node_modules, `.orca`, `.agent-pipeline`, logs, source maps and other development artifacts are excluded. Add new production modules explicitly to `scripts/build-release.mjs`. Review contents manually for secrets before publishing; pattern scanning cannot guarantee their absence. `npm run test:release` checks the inventory, byte-for-byte source equality and overwrite/symlink protection.
+The dependency-free Node builder executes no shell commands. It copies an explicit production module inventory, manifest, all three READMEs, root LICENSE when present, and `vendor/yaml` including its license. It verifies relative imports and entry points and rejects symlinks, unexpected binary content and recognizable credential patterns. Tests, fixtures, UI check scenarios, package manager files, node_modules, `.orca`, `.agent-pipeline`, logs, source maps and other development artifacts are excluded. Add new production modules explicitly to `scripts/build-release.mjs`. Review contents manually for secrets before publishing; pattern scanning cannot guarantee their absence. `npm run test:release` checks the inventory, byte-for-byte source equality and overwrite/symlink protection.
 
 ## GitHub and Orca Community publication
 
-The official Community route is a **public GitHub repository** with a **manifest v2 `orca-plugin.json` at its root**. Omit `publisher`: with `engines.orca >=1.4.248`, Orca derives the owner from the GitHub repository. A root **LICENSE** is required; this project uses MIT and retains the separate upstream YAML license. Publish **no binaries, archives or symlinks**. Orca loads TS/TSX sources directly.
+The official Community route is a **public GitHub repository** with a **manifest v2 `orca-plugin.json` at its root**. Omit `publisher`: with `engines.orca >=1.4.248`, Orca derives the owner from the GitHub repository. A root **LICENSE** is required; this project uses MIT and retains the separate upstream YAML license. The release includes the declared PNG screenshots. Executables, native binaries, archives and symlinks are prohibited. Orca loads TS/TSX sources directly.
 
-The confirmed repository is `https://github.com/Alexander-64/orca-pipeline`. Review the files and diff, and run all checks above. Keep the manifest at the repository root, not only under dist. Align manifest/package versions, add the **`orca-plugin` topic**, then create and push the **`v0.1.1` tag** matching this version. Check indexing at `https://orca.dev/plugins/alexander-64/orca-pipeline`. **No PR to `stablyai/orca-plugins` is required for Community.** Local validation does not imply Community indexing has completed.
+The confirmed repository is `https://github.com/Alexander-64/orca-pipeline`. Review the files and diff, and run all checks above. Keep the manifest at the repository root, not only under dist. Align manifest/package versions, add the **`orca-plugin` topic**, then create and push the **`v0.1.2` tag** matching this version. Check indexing at `https://orca.dev/plugins/alexander-64/orca-pipeline`. **No PR to `stablyai/orca-plugins` is required for Community.** Local validation does not imply Community indexing has completed.
 
-Once published, users can run `orca plugin install Alexander-64/orca-pipeline@v0.1.1 --json`. Executable plugins require user approval of the access listed by Orca. `private: true` in package.json prevents accidental npm publication and does not prevent GitHub/Community distribution. These instructions do not create a repository, commit, push, tag or publish anything.
+Once published, users can run `orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json`. Executable plugins require user approval of the access listed by Orca. `private: true` in package.json prevents accidental npm publication and does not prevent GitHub/Community distribution. These instructions do not create a repository, commit, push, tag or publish anything.
 
 References: [Orca authoring guide](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-authoring.md), [manifest](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-manifest.md), [listing](https://orca.dev/plugins/add) and [catalog policy](https://github.com/stablyai/orca/blob/main/docs/reference/plugin-listing-policy.md).

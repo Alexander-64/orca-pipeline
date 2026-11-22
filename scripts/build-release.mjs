@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // Explicit production inventory: new runtime modules must be reviewed here.
-const modules = 'agents artifacts beads capacity cli commands coordinator editor failover metrics mutations planner pr protocol quota scenario templates types usage worker'.split(' ')
-const required = ['orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', ...modules.map(name => `src/${name}.ts`), 'src/panel.tsx']
+const modules = 'agents artifacts beads capacity cli commands coordinator editor failover metrics mutations planner pr protocol quota scenario scenarioFiles templates types usage worker'.split(' ')
+const required = ['orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'pipelines/release.yaml', 'examples/failover/README.md', ...modules.map(name => `src/${name}.ts`), 'src/panel.tsx']
+const pngSignature = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
+const pngEnd = Buffer.from('0000000049454e44ae426082', 'hex')
 
 async function exists(file) {
   try { return await lstat(file) } catch (error) { if (error.code === 'ENOENT') return null; throw error }
@@ -14,6 +16,23 @@ async function exists(file) {
 async function regular(file) {
   const stat = await lstat(file)
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Not a regular file: ${file}`)
+}
+async function sourceDirectory(root, dir) {
+  const stat = await lstat(path.join(root, dir))
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`Invalid source directory: ${dir}`)
+}
+function screenshotPaths(manifest) {
+  if (manifest.screenshots === undefined) return new Set()
+  if (!Array.isArray(manifest.screenshots)) throw new Error('Invalid manifest screenshots')
+  const files = new Set()
+  for (const screenshot of manifest.screenshots) {
+    const file = screenshot?.path
+    if (typeof file !== 'string' || !/^assets\/[a-z0-9][a-z0-9_-]*\.png$/.test(file) || files.has(file)) {
+      throw new Error(`Invalid manifest screenshot path: ${file}`)
+    }
+    files.add(file)
+  }
+  return files
 }
 async function vendorFiles(dir, prefix = 'vendor/yaml') {
   const result = []
@@ -31,7 +50,7 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
   const root = path.resolve(projectRoot)
   const destination = path.resolve(root, out)
   const relative = path.relative(root, destination).split(path.sep)
-  if (relative.some(part => ['.agent-pipeline', '.orca', '.git', 'node_modules'].includes(part)) || ['src', 'vendor', 'scripts'].includes(relative[0])) throw new Error('Output overlaps protected project data')
+  if (relative.some(part => ['.agent-pipeline', '.orca', '.git', 'node_modules'].includes(part)) || ['src', 'vendor', 'scripts', 'assets', 'pipelines', 'examples'].includes(relative[0])) throw new Error('Output overlaps protected project data')
   const replace = destination === path.join(root, 'dist', 'agent-pipeline')
   const previous = await exists(destination)
   if (previous && !replace) throw new Error(`Output already exists; choose a fresh --out path: ${destination}`)
@@ -41,16 +60,26 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
     if (stat?.isSymbolicLink()) throw new Error(`Output parent is a symlink: ${parent}`)
     if (parent === path.dirname(parent)) break
   }
-  for (const dir of ['src', 'vendor', 'vendor/yaml', 'vendor/yaml/dist']) {
-    const stat = await lstat(path.join(root, dir))
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`Invalid source directory: ${dir}`)
-  }
-  const files = [...required, ...await vendorFiles(path.join(root, 'vendor/yaml'))]
+  for (const dir of ['src', 'pipelines', 'examples', 'examples/failover', 'vendor', 'vendor/yaml', 'vendor/yaml/dist']) await sourceDirectory(root, dir)
+  const manifestFile = path.join(root, 'orca-plugin.json')
+  await regular(manifestFile)
+  const manifestBytes = await readFile(manifestFile)
+  const manifest = JSON.parse(manifestBytes)
+  const screenshots = screenshotPaths(manifest)
+  if (screenshots.size) await sourceDirectory(root, 'assets')
+  const files = [...required, ...screenshots, ...await vendorFiles(path.join(root, 'vendor/yaml'))]
   if (await exists(path.join(root, 'LICENSE'))) files.push('LICENSE')
   const contents = new Map()
   for (const file of files.sort()) {
     await regular(path.join(root, file))
-    const bytes = await readFile(path.join(root, file))
+    const bytes = file === 'orca-plugin.json' ? manifestBytes : await readFile(path.join(root, file))
+    if (screenshots.has(file)) {
+      if (!bytes.subarray(0, pngSignature.length).equals(pngSignature) || !bytes.subarray(-pngEnd.length).equals(pngEnd)) {
+        throw new Error(`Invalid PNG screenshot: ${file}`)
+      }
+      contents.set(file, bytes)
+      continue
+    }
     if (bytes.includes(0)) throw new Error(`Binary rejected: ${file}`)
     const text = bytes.toString('utf8')
     if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{30,}|\bAKIA[A-Z0-9]{16}\b/.test(text)) throw new Error(`Possible credential in ${file}`)
@@ -61,7 +90,6 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
     }
     contents.set(file, bytes)
   }
-  const manifest = JSON.parse(contents.get('orca-plugin.json'))
   if (manifest.manifestVersion !== 2 || !contents.has(manifest.main) || !manifest.contributes.panels.every(panel => contents.has(panel.entry))) throw new Error('Invalid manifest entry points')
   await mkdir(path.dirname(destination), { recursive: true })
   // Own a unique sibling workspace; only this workspace and the explicit default

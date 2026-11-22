@@ -90,3 +90,33 @@ test('retry button sends the failed run and renders the recovered state', async 
 test('validates the real default draft', () => {
   assert.equal(parseScenario(DEFAULT_SCENARIO).steps.length, 2)
 })
+
+test('opens a repository scenario, previews its review and approval, and saves the edited draft', async () => {
+  const source = DEFAULT_SCENARIO.replace('agent: codex', 'agent: codex\n    reviewAgent: claude\n    approval: Approve this change?')
+  const calls: string[] = []
+  const view = await mount(panel, { host: mockHost({ requests: {
+    'dashboard.get': () => demoDashboard,
+    'scenario.files': () => ({ names: ['example.yaml'] }),
+    'scenario.open': ({ name }) => { assert.equal(name, 'example.yaml'); return { source } },
+    'scenario.save': ({ name, previous, source: updated, workspaceId }) => {
+      assert.equal(previous, source)
+      assert.equal(workspaceId, 'workspace-1')
+      assert.equal(updated, source.replace('demo-pipeline', 'edited'))
+      calls.push(name)
+      return { saved: true }
+    }
+  } }) })
+  await view.toggle({ label: 'Repository scenarios' })
+  await view.press({ text: 'Browse pipelines/' })
+  await view.select({ label: 'Repository file' }, 'example.yaml')
+  await view.press({ text: 'Open file' })
+  await view.toggle({ label: 'Run preview' })
+  const tree = JSON.stringify(view.tree())
+  for (const value of ['Approve this change?', 'implement-evidence', '/tmp/demo', 'pnpm test']) assert.ok(tree.includes(value), value)
+  await view.type({ label: 'YAML scenario' }, source.replace('demo-pipeline', 'edited'), { replace: true })
+  await view.press({ text: 'Save file' })
+  assert.deepEqual(calls, ['example.yaml'])
+  assert.deepEqual(view.errors, [])
+  assert.deepEqual(view.refusals, [])
+  await view.unmount()
+})

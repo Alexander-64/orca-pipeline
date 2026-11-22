@@ -50,13 +50,18 @@ test('Git inventory exposes ignored YAML dependencies even when local import wor
   )
 })
 
-test('release is complete, byte-identical, source-only and does not overwrite', async () => {
+test('release contains the complete byte-identical inventory and does not overwrite', async () => {
   const temp = await mkdtemp(path.join(await realpath(tmpdir()), 'agent-pipeline-release-'))
   try {
     const result = await buildRelease(path.join(temp, 'release'))
     assert.ok(result.files.includes('vendor/yaml/LICENSE'))
     assert.equal(result.licenseIncluded, true)
-    for (const name of ['README.md', 'README.ru.md', 'README.zh-CN.md', 'src/worker.ts', 'src/panel.tsx']) assert.ok(result.files.includes(name))
+    const manifest = JSON.parse(await readFile(path.join(root, 'orca-plugin.json'), 'utf8'))
+    assert.ok(manifest.screenshots.length > 0)
+    for (const name of [
+      'README.md', 'README.ru.md', 'README.zh-CN.md', 'src/worker.ts', 'src/panel.tsx',
+      'src/scenarioFiles.ts', 'pipelines/release.yaml', ...manifest.screenshots.map(({ path }) => path),
+    ]) assert.ok(result.files.includes(name), name)
     const actual = await readdir(result.output, { recursive: true })
     const files = []
     for (const name of actual) {
@@ -78,11 +83,33 @@ test('release is complete, byte-identical, source-only and does not overwrite', 
 async function fixture(t) {
   const projectRoot = await mkdtemp(path.join(await realpath(tmpdir()), 'release-fixture-'))
   t.after(() => rm(projectRoot, { recursive: true, force: true }))
-  for (const name of ['src', 'vendor', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
+  for (const name of ['src', 'vendor', 'assets', 'pipelines', 'examples', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
     await cp(path.join(root, name), path.join(projectRoot, name), { recursive: true })
   }
   return projectRoot
 }
+
+test('release only accepts declared PNG screenshots inside the assets directory', async t => {
+  const projectRoot = await fixture(t)
+  const manifestFile = path.join(projectRoot, 'orca-plugin.json')
+  const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
+  const [screenshot] = manifest.screenshots
+  for (const invalidPath of ['../screenshot.png', 'assets/../screenshot.png', 'assets/screenshot.jpg']) {
+    await writeFile(manifestFile, JSON.stringify({ ...manifest, screenshots: [{ ...screenshot, path: invalidPath }] }))
+    await assert.rejects(buildRelease(undefined, { projectRoot }), /Invalid manifest screenshot path/)
+  }
+  await writeFile(manifestFile, JSON.stringify(manifest))
+  const unexpected = 'assets/unlisted.png'
+  await writeFile(path.join(projectRoot, unexpected), 'unlisted asset')
+  const result = await buildRelease(undefined, { projectRoot })
+  assert.equal(result.files.includes(unexpected), false)
+  const image = path.join(projectRoot, screenshot.path)
+  await writeFile(image, 'invalid PNG')
+  await assert.rejects(buildRelease(undefined, { projectRoot }), /Invalid PNG screenshot/)
+  await rm(image)
+  await symlink(path.join(root, screenshot.path), image)
+  await assert.rejects(buildRelease(undefined, { projectRoot }), /Not a regular file/)
+})
 
 test('two default builds replace changed files and remove stale/dev files in isolation', async t => {
   const projectRoot = await fixture(t)
