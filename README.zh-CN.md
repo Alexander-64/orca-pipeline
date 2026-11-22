@@ -6,6 +6,13 @@ Agent Pipeline 是一个 Orca 插件，可以让多个智能体按依赖顺序�
 
 ![Agent Pipeline 的图形编辑器与 YAML 草稿](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/scenario-editor.png)
 
+## 可以用它做什么
+
+- **把目标写成计划。** 在 Planner 中描述目标，让选定的智能体起草 YAML。你可以在图上调整步骤、预览哪些任务可以并行，再把场景存进仓库供团队复用。
+- **分配任务。** 为每一步指定智能体、主机和 Git 工作树。例如，调研和设计可以同时进行，实现步骤等两者完成后再开始。并发数可以按整个运行、模型提供商或主机分别限制。
+- **决定何时放行。** 让另一位智能体审查改动并重复验收检查，或让指定步骤等待人工批准。发布场景还可以创建 GitHub 拉取请求，等待检查完成，再请求批准合并。
+- **查看执行记录。** 在 **Runs** 中查看每一步的尝试记录、最近一次输出和验收命令。在 **Metrics** 中比较不同智能体的尝试次数。如果项目使用 Beads，还可以在 **Beads** 中认领、关闭或重新打开关联任务。
+
 ## 安装
 
 需要 Orca **1.4.248 或更高版本**，并确保终端能调用 `orca`。
@@ -40,6 +47,27 @@ orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
 本仓库的[发布场景](pipelines/release.yaml)会锁定待发布的提交，让 Codex 构建并验证发布包、Claude 独立复核，然后等待人工批准。批准后才会向 GitHub 推送对应的版本标签，并在需要时添加 `orca-plugin` topic。使用该场景时，请在执行发布步骤的主机上登录 `gh`。
 
 Community 从公开 GitHub 仓库读取根目录下的 v2 `orca-plugin.json` 和许可证，并按版本标签分发。发布后可查看[插件目录](https://orca.dev/plugins/alexander-64/orca-pipeline)中的收录状态。
+
+## 架构与组件
+
+编辑中的草稿保存在 Orca 面板里。点击 **Start** 时，面板把 YAML 和工作区 ID 发给插件的 Node.js 工作进程。工作进程验证场景，打开协调器终端，再把启动时的场景交给协调器。之后对草稿的修改会在下次运行时生效。
+
+```mermaid
+flowchart TD
+    UI["Orca 面板"] <--> W["插件工作进程"]
+    W --> P["规划器"]
+    W --> C["协调器"]
+    W <--> S[("插件存储")]
+    P --> O["Orca CLI"]
+    C --> O
+    O --> A["本地或远程 Git 工作树中的智能体"]
+    C --> R["尝试报告"]
+    C -.-> X["Beads / GitHub PR"]
+```
+
+**规划器**调用 Orca 智能体起草方案。**协调器**创建带有依赖关系的任务，轮询 Orca 获取状态，并在任务就绪时派发。两者共用同一个 Orca CLI 客户端。工作进程把计划和运行状态的更新发回面板。[面板](src/panel.tsx) · [工作进程](src/worker.ts) · [规划器](src/planner.ts) · [协调器](src/coordinator.ts) · [Orca 客户端](src/cli.ts)
+
+计划和运行历史保存在 Orca 的插件存储中，重启后仍可查看。每次尝试结束后，协调器还会在工作区的 `.agent-pipeline/artifacts/<runId>/` 下写入一份 JSON 报告，记录执行者、状态、输出以及智能体报告的文件改动。保存供以后使用的场景位于 `pipelines/`。[尝试报告](src/artifacts.ts) · [场景文件](src/scenarioFiles.ts)
 
 ## 本地开发
 

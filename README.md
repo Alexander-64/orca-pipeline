@@ -6,6 +6,13 @@ Agent Pipeline lets you give a coding task to one agent in Orca and have another
 
 ![The editor shows Research and Design running in parallel, with their YAML alongside](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/scenario-editor.png)
 
+## What you can do
+
+- **Plan a change.** Give Planner a goal and an agent will draft a YAML scenario. Edit the steps on the map, preview which ones can run together, and save the scenario in the repository for your team.
+- **Split work across agents.** Choose a host and Git worktree for each step. Research and design can run in parallel, while implementation waits for both. Limit how many agents run at once, overall or by provider and host.
+- **Decide what can move forward.** Give a second agent the diff and acceptance checks, or ask a person to approve a step. A release scenario can also open a GitHub pull request, wait for its checks and request approval to merge.
+- **Find out what happened.** Open **Runs** for a step’s attempt history, latest output and acceptance commands. Use **Metrics** to compare attempts by agent, or **Beads** to claim, close and reopen linked issues if your project uses Beads.
+
 ## Install
 
 Install with the CLI included in Orca **1.4.248 or later**.
@@ -71,6 +78,27 @@ steps:
 Replace the agent IDs and test commands with ones available in your project. For a remote step, set `placement.host` to a saved Orca environment. Use an exact worktree selector, or choose `new-child` or `new-top-level` and set `placement.repo`.
 
 </details>
+
+## Architecture
+
+The Orca panel owns the draft you are editing. When you click **Start**, it sends the YAML and workspace ID to the plugin’s Node.js worker. The worker validates the scenario, opens a coordinator terminal and hands a snapshot to the coordinator. Later edits apply to the next run.
+
+```mermaid
+flowchart TD
+    UI["Orca panel"] <--> W["Plugin worker"]
+    W --> P["Planner"]
+    W --> C["Coordinator"]
+    W <--> S[("Plugin storage")]
+    P --> O["Orca CLI"]
+    C --> O
+    O --> A["Agents in local or remote worktrees"]
+    C --> R["Attempt reports"]
+    C -.-> X["Beads / GitHub PR"]
+```
+
+The **Planner** uses an Orca agent to produce a draft. The **Coordinator** creates tasks with dependencies, polls Orca for their status and dispatches ready work. Both use the same CLI client. The worker sends plan and run updates back to the panel. [Panel](src/panel.tsx) · [Worker](src/worker.ts) · [Planner](src/planner.ts) · [Coordinator](src/coordinator.ts) · [Orca client](src/cli.ts)
+
+Orca’s plugin storage keeps plans and run history across restarts. When an attempt ends, the coordinator writes a JSON report in the coordinator workspace under `.agent-pipeline/artifacts/<runId>/`, with the agent, its status, output and any reported file changes. Scenarios you save for reuse live separately in `pipelines/`. [Attempt reports](src/artifacts.ts) · [Scenario files](src/scenarioFiles.ts)
 
 <details>
 <summary>Development and release checks</summary>
