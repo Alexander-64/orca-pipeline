@@ -7,7 +7,7 @@ export function waves(steps: ScenarioStep[]): ScenarioStep[][] {
   const result: ScenarioStep[][] = []
   while (remaining.length) {
     const wave = remaining.filter(step => step.needs.every(id => done.has(id)))
-    if (!wave.length) throw new Error('Цикл или неизвестная зависимость')
+    if (!wave.length) throw new Error('Dependency cycle or unknown dependency')
     result.push(wave)
     for (const step of wave) {
       done.add(step.id)
@@ -32,8 +32,8 @@ export function insertStep(scenario: Scenario, parent?: string, duplicate?: stri
   const reserved = new Set(scenario.steps.flatMap(step => [step.id, `${step.id}-evidence`]))
   while (reserved.has(`step-${index}`)) index++
   const source = scenario.steps.find(step => step.id === duplicate)
-  const step: ScenarioStep = source ? { ...source, id: `step-${index}`, title: `${source.title} (копия)` } : {
-    id: `step-${index}`, title: `Шаг ${index}`, spec: 'Опиши результат и границы изменений',
+  const step: ScenarioStep = source ? { ...source, id: `step-${index}`, title: `${source.title} (copy)` } : {
+    id: `step-${index}`, title: `Step ${index}`, spec: 'Describe the expected result and the scope of the changes',
     needs: parent ? [parent] : [], agent: 'codex', fallback: ['claude'],
     placement: { host: 'local', worktree: 'current' }, acceptance: ['npm test'], maxAttempts: 3, maxRepairs: 2
   }

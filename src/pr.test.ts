@@ -16,7 +16,7 @@ function prClient(states: string[][], headRefOid = 'head-1') {
       return { url: 'https://example/pr/1', headRefOid, checks: current.map((state) => ({ name: 'test', state })) }
     },
     merge: async (_url, expectedHead) => {
-      if (expectedHead !== headRefOid) throw new Error('PR head изменился; merge остановлен')
+      if (expectedHead !== headRefOid) throw new Error('The PR head changed. Merge stopped')
       calls.push('merge')
     }
   }
@@ -91,11 +91,11 @@ ${oneStep}`))
   h.statuses.set('task_build', 'completed')
   await h.coordinator.tick(run.id)
   pr.client.checks = async () => ({ url: 'https://example/pr/1', headRefOid: 'head-2', checks: [{ name: 'test', state: 'success' }] })
-  pr.client.merge = async () => { throw new Error('PR head изменился; merge остановлен') }
+  pr.client.merge = async () => { throw new Error('The PR head changed. Merge stopped') }
   await h.coordinator.resolveGate(run.id, 'build', 'approve')
   await h.coordinator.tick(run.id)
   assert.ok(!pr.calls.includes('merge'))
-  assert.match(run.error ?? '', /head изменился/)
+  assert.match(run.error ?? '', /head changed/)
 })
 
 test('requires mergeApproval when merge is enabled', () => {

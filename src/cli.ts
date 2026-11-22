@@ -29,7 +29,7 @@ function payload(output: string): unknown {
   try {
     return JSON.parse(output)
   } catch {
-    throw new Error(`Команда вернула не JSON: ${output.slice(0, 300)}`)
+    throw new Error(`The command returned invalid JSON: ${output.slice(0, 300)}`)
   }
 }
 
@@ -66,7 +66,7 @@ export class OrcaClient {
     const parsed = payload(result.stdout || result.stderr)
     const root = record(parsed)
     if (result.code !== 0 || root.ok === false) {
-      const error = new Error(errorMessage(parsed, `Orca завершила команду с кодом ${result.code}: ${result.stderr || result.stdout}`)) as Error & { details?: unknown }
+      const error = new Error(errorMessage(parsed, `Orca exited with code ${result.code}: ${result.stderr || result.stdout}`)) as Error & { details?: unknown }
       error.details = parsed
       throw error
     }
@@ -92,7 +92,7 @@ export class OrcaClient {
     try {
       shown = await this.call(['orchestration', 'request-show', '--request', record.requestId])
     } catch {
-      throw original instanceof Error ? original : new Error(`Не удалось восстановить mutation ${record.requestId}`)
+      throw original instanceof Error ? original : new Error(`Could not recover mutation ${record.requestId}`)
     }
     const requestData = recordRequest(shown)
     const status = shown.state ?? shown.status ?? requestData.state ?? requestData.status
@@ -102,7 +102,7 @@ export class OrcaClient {
       return receipt
     }
     if (status === 'pending') return this.executeMutation(record)
-    const error = new Error(`Orca не подтвердила mutation ${record.requestId}: ${String(status ?? 'absent')}${original instanceof Error ? `; ${original.message}` : ''}`)
+    const error = new Error(`Orca did not confirm mutation ${record.requestId}: ${String(status ?? 'absent')}${original instanceof Error ? `; ${original.message}` : ''}`)
     await this.journal.put({ ...record, status: 'failed', error: error.message })
     throw error
   }
@@ -125,7 +125,7 @@ export class OrcaClient {
   async createRun(objective: string, coordinatorHandle: string): Promise<string> {
     const result = await this.mutate(['orchestration', 'run-create', '--objective', objective, '--from', coordinatorHandle])
     const id = record(result.run).id
-    if (typeof id !== 'string') throw new Error('Orca не вернула Run ID')
+    if (typeof id !== 'string') throw new Error('Orca did not return a Run ID')
     return id
   }
 
@@ -140,7 +140,7 @@ export class OrcaClient {
       '--spec', spec, '--deps', JSON.stringify(dependencies)
     ])
     const id = record(result.task).id
-    if (typeof id !== 'string') throw new Error(`Orca не вернула Task ID для ${step.id}`)
+    if (typeof id !== 'string') throw new Error(`Orca did not return a Task ID for ${step.id}`)
     return id
   }
 
@@ -150,7 +150,7 @@ export class OrcaClient {
       '--options', JSON.stringify(['approve', 'reject']), '--from', coordinatorHandle
     ])
     const id = record(result.gate).id ?? result.id
-    if (typeof id !== 'string') throw new Error(`Orca не вернула Gate ID для ${taskId}`)
+    if (typeof id !== 'string') throw new Error(`Orca did not return a Gate ID for ${taskId}`)
     return id
   }
 
@@ -173,10 +173,10 @@ export class OrcaClient {
     const environment = step.placement.host
     const status = await this.call(['status', '--environment', environment])
     const runtime = record(status.runtime)
-    if (runtime.state !== 'ready') throw new Error(`Remote ${environment} не готов: ${String(runtime.state ?? 'unknown')}`)
+    if (runtime.state !== 'ready') throw new Error(`Remote ${environment} is not ready: ${String(runtime.state ?? 'unknown')}`)
     const capabilities = Array.isArray(runtime.capabilities) ? runtime.capabilities : []
     if ((step.model || step.effort) && !capabilities.includes('orchestration.worker-launch-preferences.v1')) {
-      throw new Error(`Remote ${environment} не поддерживает model/effort для orchestration`)
+      throw new Error(`Remote ${environment} does not support model or effort for orchestration`)
     }
     if (step.placement.worktree === 'new-child' || step.placement.worktree === 'new-top-level') {
       await this.call(['repo', 'show', '--repo', step.placement.repo!, '--environment', environment])
@@ -209,7 +209,7 @@ export class OrcaClient {
     const dispatch = record(result.dispatch)
     const launch = record(result.launch)
     const id = dispatch.id ?? result.dispatchId ?? result.dispatch_id ?? record(result.worker).id ?? launch.dispatchId
-    if (typeof id !== 'string') throw new Error(`Orca не вернула Dispatch ID для ${step.id}: ${JSON.stringify(result).slice(0, 500)}`)
+    if (typeof id !== 'string') throw new Error(`Orca did not return a Dispatch ID for ${step.id}: ${JSON.stringify(result).slice(0, 500)}`)
     return id
   }
 

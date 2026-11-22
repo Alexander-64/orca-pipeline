@@ -46,7 +46,7 @@ export class GhPrClient implements PrClient {
 
   async merge(url: string, expectedHead: string): Promise<void> {
     const current = await this.checks(url)
-    if (current.headRefOid !== expectedHead) throw new Error('PR head изменился; merge остановлен')
+    if (current.headRefOid !== expectedHead) throw new Error('The PR head changed. Merge stopped')
     await this.call(['pr', 'merge', url, '--merge'])
   }
 }

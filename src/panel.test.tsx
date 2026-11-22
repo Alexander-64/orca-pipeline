@@ -13,7 +13,7 @@ test('loads workspaces and validates the YAML draft', async () => {
   })
   const view = await mount(panel, { host })
   assert.equal(view.valueOf({ label: 'Workspace' }), 'workspace-1')
-  await view.press({ text: 'Проверить YAML' })
+  await view.press({ text: 'Validate YAML' })
   assert.deepEqual(view.errors, [])
   assert.deepEqual(view.refusals, [])
   await view.unmount()
@@ -27,11 +27,11 @@ test('starts a run and shows its execution state', async () => {
     }
   })
   const view = await mount(panel, { host })
-  await view.press({ text: 'Запустить' })
+  await view.press({ text: 'Start' })
   assert.ok(view.find({ text: /demo-pipeline/ }))
-  assert.ok(view.find({ text: /Реализация/ }))
+  assert.ok(view.find({ text: /Implementation/ }))
   await view.select({ label: 'Agent Pipeline' }, 'beads')
-  assert.deepEqual(view.rowsOf({ label: 'Задачи Beads' }), ['bd-demo1'])
+  assert.deepEqual(view.rowsOf({ label: 'Beads tasks' }), ['bd-demo1'])
   assert.deepEqual(view.errors, [])
   assert.deepEqual(view.refusals, [])
   await view.unmount()
@@ -46,14 +46,14 @@ test('fills the draft when the planner returns a scenario', async () => {
     }
   })
   const view = await mount(panel, { host })
-  await view.toggle({ label: 'Составить сценарий агентом' })
-  await view.type({ label: 'Цель' }, 'Сделать экспорт')
-  await view.press({ text: 'Составить YAML' })
-  assert.ok(view.find({ text: 'Planner работает…' }))
+  await view.toggle({ label: 'Plan a scenario with an agent' })
+  await view.type({ label: 'Objective' }, 'Сделать экспорт')
+  await view.press({ text: 'Generate YAML' })
+  assert.ok(view.find({ text: 'Planner is running…' }))
   await view.post('plan.changed', {
     plan: { id: 'plan-1', runId: 'run-plan', dispatchId: 'dispatch-plan', agent: 'codex', status: 'done', source }
   })
-  assert.match(String(view.valueOf({ label: 'YAML-сценарий' })), /generated-pipeline/)
+  assert.match(String(view.valueOf({ label: 'YAML scenario' })), /generated-pipeline/)
   assert.deepEqual(view.errors, [])
   await view.unmount()
 })
@@ -81,7 +81,7 @@ test('retry button sends the failed run and renders the recovered state', async 
     host,
     persisted: { plugin: { 'pipeline.tab': 'runs', 'pipeline.run': failed.id } }
   })
-  await view.press({ text: 'Следующий fallback' })
+  await view.press({ text: 'Try next fallback' })
   assert.ok(view.find({ role: 'status', text: 'done' }))
   assert.deepEqual(view.errors, [])
   await view.unmount()

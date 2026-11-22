@@ -11,7 +11,7 @@ type Deps = {
 export function extractYaml(output: string): string {
   const blocks = [...output.matchAll(/```(?:yaml|yml)\s*\n([\s\S]*?)```/gi)]
   const source = blocks.at(-1)?.[1]?.trim()
-  if (!source) throw new Error('Planner не вернул fenced YAML-блок')
+  if (!source) throw new Error('Planner returned no fenced YAML block')
   parseScenario(source)
   return `${source}\n`
 }
@@ -44,7 +44,7 @@ export class Planner {
 
   get(id: string): PlannerRun {
     const plan = this.plans.get(id)
-    if (!plan) throw new Error(`Planner ${id} не найден`)
+    if (!plan) throw new Error(`Planner ${id} was not found`)
     return plan
   }
 
@@ -57,26 +57,26 @@ export class Planner {
   }
 
   async start(workspace: Workspace, coordinatorHandle: string, objective: string, agent: string): Promise<PlannerRun> {
-    if (!objective.trim()) throw new Error('Опишите цель для planner')
-    const runId = await this.deps.client.createRun(`Составить pipeline: ${objective}`, coordinatorHandle)
+    if (!objective.trim()) throw new Error('Enter an objective for the planner')
+    const runId = await this.deps.client.createRun(`Plan a pipeline: ${objective}`, coordinatorHandle)
     const step: ScenarioStep = {
       id: 'plan',
-      title: 'Составить YAML-сценарий',
+      title: 'Generate a YAML scenario',
       spec: objective,
       needs: [],
       agent,
       fallback: [],
       placement: { host: 'local', worktree: 'current' },
-      acceptance: ['YAML проходит проверку схемы'],
+      acceptance: ['YAML passes schema validation'],
       maxAttempts: 1,
       maxRepairs: 0
     }
     const spec = [
-      'Ты planner агентного pipeline. Не изменяй файлы и не запускай команды, меняющие workspace.',
-      `Цель пользователя: ${objective}`,
-      'Составь DAG из небольших независимых шагов. Для каждого шага укажи самодостаточный spec, agent, fallback, placement и объективные acceptance-команды. Используй local/current, если пользователь явно не указал remote. Добавь отдельный независимый review для важных изменений. Не выдумывай имена remote hosts, модели и команды проекта.',
-      'В финальном ответе верни ровно один блок ```yaml с полями name, objective и steps. Каждый step: id, title, spec, agent, fallback, placement, acceptance; при необходимости needs, model, effort, maxAttempts. Не добавляй пояснений после YAML.',
-      'Затем отправь worker_done с реальным outcome.'
+      'You are the planner for an agent pipeline. Keep the workspace read-only.',
+      `User objective: ${objective}`,
+      'Plan a DAG of small independent steps. For each step, give a self-contained spec, agent, fallback, placement and objective acceptance commands. Use local/current unless the user explicitly requests a remote host. Include an independent review for significant changes. Use only known remote host names, models and project commands.',
+      'In your final answer, return exactly one ```yaml fenced block with name, objective and steps. Each step contains id, title, spec, agent, fallback, placement and acceptance, plus needs, model, effort and maxAttempts when needed. End your answer with the YAML block.',
+      'Then send worker_done with the actual outcome.'
     ].join('\n\n')
     const taskId = await this.deps.client.createTask(runId, coordinatorHandle, step, spec, [])
     const dispatchId = await this.deps.client.startWorker(
@@ -108,7 +108,7 @@ export class Planner {
         this.deps.notify(plan)
       } else if (['failed', 'stopped', 'cancelled', 'canceled'].includes(status)) {
         plan.status = 'failed'
-        plan.error = await this.deps.client.workerOutput(plan.dispatchId).catch(() => 'Planner завершился с ошибкой')
+        plan.error = await this.deps.client.workerOutput(plan.dispatchId).catch(() => 'The planner failed')
         this.deps.notify(plan)
       }
     } catch (error) {

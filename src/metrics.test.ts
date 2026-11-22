@@ -41,7 +41,7 @@ test('renders agent metrics and run timeline', async () => {
     requests: { 'dashboard.get': () => ({ ...demoDashboard, runs: [demoRun], metrics: metricsForRuns([demoRun]) }) }
   })
   const view = await mount(panel, { host, persisted: { plugin: { 'pipeline.tab': 'metrics' } } })
-  assert.deepEqual(view.rowsOf({ label: 'По агентам' }), ['codex'])
+  assert.deepEqual(view.rowsOf({ label: 'By agent' }), ['codex'])
   assert.ok(view.find({ text: /demo-pipeline/ }))
   await view.unmount()
 })

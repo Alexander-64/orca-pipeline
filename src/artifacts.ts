@@ -18,7 +18,7 @@ export class ArtifactStore {
     const directory = join(this.workspacePath, '.agent-pipeline', 'artifacts', safe(run.runId))
     await mkdir(directory, { recursive: true })
     const step = run.scenario.steps.find((candidate) => candidate.id === task.stepId)
-    if (!step) throw new Error(`Шаг ${task.stepId} не найден для артефакта`)
+    if (!step) throw new Error(`Step ${task.stepId} was not found for the artifact`)
     const path = join(directory, `${safe(task.stepId)}-${safe(attempt.dispatchId)}.json`)
     const content = {
       version: 1,

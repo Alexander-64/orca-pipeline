@@ -9,7 +9,7 @@ function parse(output: string): unknown {
   try {
     return JSON.parse(output)
   } catch {
-    throw new Error(`bd вернул не JSON: ${output.slice(0, 300)}`)
+    throw new Error(`bd returned invalid JSON: ${output.slice(0, 300)}`)
   }
 }
 
@@ -64,14 +64,14 @@ export class BeadsClient {
     if (typeof value === 'string') return value.trim()
     const raw = object(value)
     const id = raw.id ?? object(raw.issue).id
-    if (typeof id !== 'string') throw new Error(`bd не вернул ID для ${step.id}`)
+    if (typeof id !== 'string') throw new Error(`bd did not return an ID for ${step.id}`)
     return id
   }
 
   async sync(run: PipelineRun, task: PipelineTask): Promise<void> {
     if (!task.beadId) return
     if (task.status === 'done' || task.status === 'superseded') {
-      const reason = task.status === 'done' ? 'Проверки Orca Task завершены успешно' : 'Заменено новым repair/review циклом'
+      const reason = task.status === 'done' ? 'Orca Task checks passed' : 'Superseded by a new repair and review cycle'
       await this.call(['close', task.beadId, '--reason', reason])
       return
     }

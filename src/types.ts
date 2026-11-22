@@ -160,12 +160,12 @@ export type PlannerRun = {
 }
 
 export const DEFAULT_SCENARIO = `name: demo-pipeline
-objective: Проверить небольшое изменение и независимо оценить результат
+objective: Make a small change and have an independent reviewer verify it
 steps:
   - id: implement
-    title: Реализация
+    title: Implementation
     spec: |
-      Опиши точную задачу исполнителя, границы изменений и ожидаемый результат.
+      Describe the exact task, the scope of the changes and the expected result.
     agent: codex
     fallback: [claude, kimi]
     placement:
@@ -174,10 +174,10 @@ steps:
     acceptance:
       - "pnpm test"
   - id: review
-    title: Независимая проверка
+    title: Independent review
     needs: [implement]
     spec: |
-      Проверь результат предыдущего шага, запусти проверки и доложи найденные проблемы.
+      Review the previous step, run the checks and report any issues.
     agent: claude
     placement:
       host: local

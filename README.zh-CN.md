@@ -1,6 +1,6 @@
 # Agent Pipeline
 
-[Русский](README.md) · [English](README.en.md) · [简体中文](README.zh-CN.md)
+[English](README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md)
 
 用于智能体 DAG 工作流的 Orca 插件：Planner 生成 YAML，Orca 通过 Run/Task/Dispatch 执行步骤，Beads 跟踪任务。步骤因配额问题而被确认失败后，协调器可以生成续接检查点并切换到下一个智能体。
 
@@ -44,6 +44,7 @@ npm ci
 orca plugin types . --json
 npm run typecheck
 npm test
+npm run test:release
 npm run check
 npm run validate
 ```

@@ -56,7 +56,7 @@ export class Coordinator {
 
   get(id: string): PipelineRun {
     const run = this.runs.get(id)
-    if (!run) throw new Error(`Запуск ${id} не найден`)
+    if (!run) throw new Error(`Run ${id} was not found`)
     return run
   }
 
@@ -91,7 +91,7 @@ export class Coordinator {
       const remaining = new Map(scenario.steps.map((step) => [step.id, step]))
       while (remaining.size) {
         const step = [...remaining.values()].find((candidate) => candidate.needs.every((id) => run.tasks[id]?.taskId))
-        if (!step) throw new Error('Не удалось упорядочить шаги сценария')
+        if (!step) throw new Error('Could not order the scenario steps')
         const dependencies = step.needs.map((id) => run.tasks[id].taskId)
         const taskId = await this.deps.client.createTask(runId, coordinatorHandle, step, taskSpec(step), dependencies)
         const task: PipelineTask = { stepId: step.id, taskId, status: 'pending', agent: step.agent, attempts: [] }
@@ -226,7 +226,7 @@ export class Coordinator {
     if (!this.deps.pr) {
       run.pr = { url: '', headRefOid: '', status: 'failed' }
       run.status = 'failed'
-      run.error = 'PR client недоступен'
+      run.error = 'The PR client is unavailable'
       return
     }
     if (!run.pr) {
@@ -278,7 +278,7 @@ export class Coordinator {
     if (resolution === 'approve' || status === 'approved') return true
     if (resolution === 'reject' || status === 'rejected') {
       task.status = 'failed'
-      task.error = 'Пользователь отклонил запуск шага'
+      task.error = 'The user rejected this step'
       await this.syncBead(run, task)
       return false
     }
@@ -289,7 +289,7 @@ export class Coordinator {
   async resolveGate(id: string, stepId: string, resolution: 'approve' | 'reject'): Promise<void> {
     const run = this.get(id)
     const task = run.tasks[stepId]
-    if (!task?.gateId) throw new Error(`Для шага ${stepId} нет approval gate`)
+    if (!task?.gateId) throw new Error(`Step ${stepId} has no approval gate`)
     await this.deps.client.resolveGate(task.gateId, run.coordinatorHandle, resolution)
     await this.tick(id)
   }
@@ -319,7 +319,7 @@ export class Coordinator {
     }
     if (!agent) {
       task.status = 'failed'
-      task.error = selectionReason ?? 'Запасные агенты исчерпаны'
+      task.error = selectionReason ?? 'No fallback agents remain'
       return
     }
     const handoff = previous ? handoffFor(step, task.attempts) : undefined
@@ -368,7 +368,7 @@ export class Coordinator {
     const last = task.attempts.at(-1)
     if (!last) {
       task.status = 'failed'
-      task.error = 'Orca Task завершилась с ошибкой до запуска worker'
+      task.error = 'The Orca Task failed before the worker started'
       return
     }
     const output = await this.deps.client.workerOutput(last.dispatchId).catch(() => '')
@@ -390,7 +390,7 @@ export class Coordinator {
       return
     }
     task.status = 'failed'
-    task.error = kind === 'quota' ? 'Лимит исчерпан, подходящих запасных агентов нет' : `Исполнитель завершился: ${kind}`
+    task.error = kind === 'quota' ? 'Quota exhausted and no eligible fallback agents remain' : `Worker finished: ${kind}`
     await this.syncBead(run, task)
   }
 
@@ -407,8 +407,8 @@ export class Coordinator {
       const repair: ScenarioStep = {
         ...original,
         id: repairId,
-        title: `Исправление ${round}: ${original.title}`,
-        spec: `${original.spec}\n\nИсправь замечания Evidence Gate:\n${output}`,
+        title: `Repair ${round}: ${original.title}`,
+        spec: `${original.spec}\n\nAddress the Evidence Gate findings:\n${output}`,
         needs: [original.id],
         reviewAgent: undefined,
         role: 'repair',
@@ -419,7 +419,7 @@ export class Coordinator {
       run.scenario.steps.push(repair)
       run.tasks[repair.id] = { stepId: repair.id, taskId: repairTaskId, status: 'pending', agent: repair.agent, attempts: [] }
       task.status = 'superseded'
-      task.error = 'FIX-FIRST: создано исправление'
+      task.error = 'FIX-FIRST: scheduled a repair'
       await this.createBeads(run)
       await this.syncBead(run, task)
       run.updatedAt = now()
@@ -427,7 +427,7 @@ export class Coordinator {
       return
     }
     task.status = 'failed'
-    task.error = /FIX-FIRST/i.test(output) ? 'Evidence Gate: лимит исправлений исчерпан' : 'Evidence Gate: BLOCKED'
+    task.error = /FIX-FIRST/i.test(output) ? 'Evidence Gate: reached the repair limit' : 'Evidence Gate: BLOCKED'
     await this.syncBead(run, task)
   }
 
@@ -490,12 +490,12 @@ export class Coordinator {
 
   async retry(id: string): Promise<void> {
     const run = this.get(id)
-    if (run.status !== 'failed') throw new Error('Повторять можно только failed pipeline')
+    if (run.status !== 'failed') throw new Error('Only a failed pipeline can be retried')
     const failed = run.scenario.steps.filter((step) => run.tasks[step.id]?.status === 'failed')
     for (const step of failed) {
       const task = run.tasks[step.id]
       if (task.attempts.length >= step.maxAttempts || !nextAgent(step, task.attempts)) {
-        throw new Error(`Для шага ${step.title} не осталось fallback-агентов`)
+        throw new Error(`Step ${step.title} has no fallback agents remaining`)
       }
     }
     await this.deps.client.bindRun(run.runId, run.coordinatorHandle)
@@ -538,12 +538,12 @@ export class Coordinator {
     const run = this.get(id)
     const step = run.scenario.steps.find((candidate) => candidate.id === stepId)
     const task = run.tasks[stepId]
-    if (!step || !task) throw new Error(`Шаг ${stepId} не найден`)
+    if (!step || !task) throw new Error(`Step ${stepId} was not found`)
     const last = task.attempts.at(-1)
-    if (!last || last.status !== 'running') throw new Error('Переключать можно только активный Dispatch')
-    if (task.attempts.length >= step.maxAttempts) throw new Error('Лимит попыток исчерпан')
+    if (!last || last.status !== 'running') throw new Error('Only an active Dispatch can switch agents')
+    if (task.attempts.length >= step.maxAttempts) throw new Error('Attempt limit reached')
     const replacement = nextAgent(step, task.attempts)
-    if (!replacement) throw new Error('Запасные агенты исчерпаны')
+    if (!replacement) throw new Error('No fallback agents remain')
     last.output = await this.deps.client.workerOutput(last.dispatchId).catch(() => '')
     await this.deps.client.stopWorker(last.dispatchId)
     last.status = 'failed'

@@ -31,10 +31,10 @@ test('filters board rows by search and status', async () => {
     requests: { 'dashboard.get': () => ({ ...demoDashboard, beads }) }
   })
   const view = await mount(panel, { host, persisted: { plugin: { 'pipeline.tab': 'beads' } } })
-  await view.type({ label: 'Поиск по задачам' }, 'export')
-  assert.deepEqual(view.rowsOf({ label: 'Задачи Beads' }), ['bd-open'])
-  await view.select({ label: 'Статус' }, 'closed')
-  assert.deepEqual(view.rowsOf({ label: 'Задачи Beads' }), [])
+  await view.type({ label: 'Search tasks' }, 'export')
+  assert.deepEqual(view.rowsOf({ label: 'Beads tasks' }), ['bd-open'])
+  await view.select({ label: 'Status' }, 'closed')
+  assert.deepEqual(view.rowsOf({ label: 'Beads tasks' }), [])
   await view.unmount()
 })
 
@@ -50,7 +50,7 @@ test('activating an open row claims it and refreshes the board', async () => {
     }
   })
   const view = await mount(panel, { host, persisted: { plugin: { 'pipeline.tab': 'beads' } } })
-  await view.activateRow({ label: 'Задачи Beads' }, 'bd-open')
+  await view.activateRow({ label: 'Beads tasks' }, 'bd-open')
   assert.equal(action, 'claim')
   assert.ok(view.find({ text: /in_progress/ }))
   await view.unmount()
@@ -61,6 +61,6 @@ test('shows epic completion progress', async () => {
     requests: { 'dashboard.get': () => ({ ...demoDashboard, beads }) }
   })
   const view = await mount(panel, { host, persisted: { plugin: { 'pipeline.tab': 'beads' } } })
-  assert.ok(view.find({ text: /1\/2 закрыто/ }))
+  assert.ok(view.find({ text: /1\/2 closed/ }))
   await view.unmount()
 })

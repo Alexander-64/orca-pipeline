@@ -95,10 +95,10 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('beads.action', async ({ workspaceId, id, action }) => {
     await initialized
     const workspace = (await workspaces()).find((candidate) => candidate.id === workspaceId)
-    if (!workspace) throw new Error('Workspace не найден')
+    if (!workspace) throw new Error('Workspace not found')
     const beads = beadsFor(workspace.path)
     if (action === 'claim') await beads.claim(id)
-    else if (action === 'close') await beads.close(id, 'Закрыто из Agent Pipeline')
+    else if (action === 'close') await beads.close(id, 'Closed from Agent Pipeline')
     else await beads.reopen(id)
     return dashboard(workspaceId)
   })
@@ -110,7 +110,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('plan.start', async ({ workspaceId, objective, agent }) => {
     await initialized
     const workspace = (await workspaces()).find((candidate) => candidate.id === workspaceId)
-    if (!workspace) throw new Error('Выберите workspace')
+    if (!workspace) throw new Error('Select a workspace')
     const { terminalId } = await orca.host.call('terminal.create', { workspaceId, title: 'Pipeline planner' })
     return json({ plan: await planner.start(workspace, terminalId, objective, agent) })
   })
@@ -123,7 +123,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     await initialized
     const scenario = parseScenario(source)
     const workspace = (await workspaces()).find((candidate) => candidate.id === workspaceId)
-    if (!workspace) throw new Error('Выберите доступный workspace')
+    if (!workspace) throw new Error('Select an available workspace')
     const { terminalId } = await orca.host.call('terminal.create', {
       workspaceId,
       title: `Pipeline: ${scenario.name}`

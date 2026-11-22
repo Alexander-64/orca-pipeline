@@ -29,7 +29,7 @@ test('parses and normalizes a valid DAG', () => {
 })
 
 test('rejects cycles and missing acceptance', () => {
-  assert.throws(() => parseScenario(valid.replace('needs: [build]', 'needs: [review]')), /зависит от себя|цикл/)
+  assert.throws(() => parseScenario(valid.replace('needs: [build]', 'needs: [review]')), /depends on itself|cycle/)
   assert.throws(() => parseScenario(valid.replace('    acceptance: [pnpm test]\n', '')), /acceptance/)
 })
 

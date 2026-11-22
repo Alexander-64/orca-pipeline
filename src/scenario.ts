@@ -6,24 +6,24 @@ const ID = /^[a-z][a-z0-9-]*$/
 const WORKSPACES = new Set(['current', 'new-child', 'new-top-level'])
 
 function object(value: unknown, path: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}: ожидается объект`)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}: expected an object`)
   return value as Record<string, unknown>
 }
 
 function text(value: unknown, path: string, allowEmpty = false): string {
-  if (typeof value !== 'string' || (!allowEmpty && !value.trim())) throw new Error(`${path}: нужна непустая строка`)
+  if (typeof value !== 'string' || (!allowEmpty && !value.trim())) throw new Error(`${path}: expected a non-empty string`)
   return value.trim()
 }
 
 function strings(value: unknown, path: string): string[] {
   if (value === undefined) return []
-  if (!Array.isArray(value)) throw new Error(`${path}: ожидается список строк`)
+  if (!Array.isArray(value)) throw new Error(`${path}: expected a list of strings`)
   return value.map((item, index) => text(item, `${path}[${index}]`))
 }
 
 function positiveInteger(value: unknown, path: string): number {
   const result = Number(value)
-  if (!Number.isInteger(result) || result < 1 || result > 16) throw new Error(`${path}: допустимо от 1 до 16`)
+  if (!Number.isInteger(result) || result < 1 || result > 16) throw new Error(`${path}: expected a value from 1 to 16`)
   return result
 }
 
@@ -50,33 +50,33 @@ function parseRoles(value: unknown): Record<string, AgentPolicy> | undefined {
 function stepFrom(value: unknown, index: number, roles?: Record<string, AgentPolicy>): ScenarioStep {
   const raw = object(value, `steps[${index}]`)
   const id = text(raw.id, `steps[${index}].id`)
-  if (!ID.test(id)) throw new Error(`steps[${index}].id: используйте строчные буквы, цифры и дефис`)
+  if (!ID.test(id)) throw new Error(`steps[${index}].id: use lowercase letters, digits and hyphens`)
   const placementRaw = raw.placement === undefined ? {} : object(raw.placement, `steps[${index}].placement`)
   const host = placementRaw.host === undefined ? 'local' : text(placementRaw.host, `steps[${index}].placement.host`)
   const worktree = placementRaw.worktree === undefined
     ? 'current'
     : text(placementRaw.worktree, `steps[${index}].placement.worktree`)
   if (host !== 'local' && worktree === 'current') {
-    throw new Error(`steps[${index}]: для remote нужен exact workspace selector или new-top-level`)
+    throw new Error(`steps[${index}]: a remote step requires an exact workspace selector or new-top-level`)
   }
   if (host !== 'local' && WORKSPACES.has(worktree) && worktree !== 'current' && placementRaw.repo === undefined) {
-    throw new Error(`steps[${index}]: для нового remote worktree нужен placement.repo`)
+    throw new Error(`steps[${index}]: a new remote worktree requires placement.repo`)
   }
   const attempts = raw.maxAttempts === undefined ? 3 : Number(raw.maxAttempts)
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > 3) {
-    throw new Error(`steps[${index}].maxAttempts: допустимо от 1 до 3`)
+    throw new Error(`steps[${index}].maxAttempts: expected a value from 1 to 3`)
   }
   const repairs = raw.maxRepairs === undefined ? 2 : Number(raw.maxRepairs)
   if (!Number.isInteger(repairs) || repairs < 0 || repairs > 2) {
-    throw new Error(`steps[${index}].maxRepairs: допустимо от 0 до 2`)
+    throw new Error(`steps[${index}].maxRepairs: expected a value from 0 to 2`)
   }
   const acceptance = strings(raw.acceptance, `steps[${index}].acceptance`)
-  if (acceptance.length === 0) throw new Error(`steps[${index}].acceptance: нужна хотя бы одна проверка`)
+  if (acceptance.length === 0) throw new Error(`steps[${index}].acceptance: at least one check is required`)
   const setup = placementRaw.setup === undefined ? undefined : text(placementRaw.setup, `steps[${index}].placement.setup`)
-  if (setup && !['run', 'skip', 'inherit'].includes(setup)) throw new Error(`steps[${index}].placement.setup: run, skip или inherit`)
+  if (setup && !['run', 'skip', 'inherit'].includes(setup)) throw new Error(`steps[${index}].placement.setup: expected run, skip or inherit`)
   const routingRole = raw.role === undefined ? undefined : text(raw.role, `steps[${index}].role`)
   const policy = routingRole ? roles?.[routingRole] : undefined
-  if (routingRole && !policy) throw new Error(`steps[${index}]: неизвестная роль ${routingRole}`)
+  if (routingRole && !policy) throw new Error(`steps[${index}]: unknown role ${routingRole}`)
   const agent = raw.agent ?? policy?.agent
   return {
     id,
@@ -108,9 +108,9 @@ function expandEvidenceGates(steps: ScenarioStep[]): ScenarioStep[] {
   const evidenceIds = new Map<string, string>()
   for (const step of steps) {
     if (!step.reviewAgent) continue
-    if (step.reviewAgent === step.agent) throw new Error(`steps.${step.id}: reviewAgent должен отличаться от исполнителя`)
+    if (step.reviewAgent === step.agent) throw new Error(`steps.${step.id}: reviewAgent must differ from the implementing agent`)
     const id = `${step.id}-evidence`
-    if (steps.some((candidate) => candidate.id === id)) throw new Error(`steps.${step.id}: ${id} уже существует`)
+    if (steps.some((candidate) => candidate.id === id)) throw new Error(`steps.${step.id}: ${id} already exists`)
     evidenceIds.set(step.id, id)
   }
   const expanded: ScenarioStep[] = []
@@ -121,7 +121,7 @@ function expandEvidenceGates(steps: ScenarioStep[]): ScenarioStep[] {
       ...step,
       id: `${step.id}-evidence`,
       title: `Evidence Gate: ${step.title}`,
-      spec: `Независимо проверь «${step.title}»: изучи git diff, повторно выполни все acceptance-команды и сверь результат с исходной задачей. Не исправляй код сам. Верни вердикт SHIP, FIX-FIRST или BLOCKED с конкретными доказательствами.`,
+      spec: `Independently review “${step.title}”. Inspect the Git diff, rerun all acceptance commands and compare the result with the original task. Do not fix the code yourself. Return SHIP, FIX-FIRST or BLOCKED with concrete evidence.`,
       needs: [step.id],
       agent: step.reviewAgent,
       fallback: step.fallback.filter((agent) => agent !== step.reviewAgent && agent !== step.agent),
@@ -131,7 +131,7 @@ function expandEvidenceGates(steps: ScenarioStep[]): ScenarioStep[] {
       repairRound: 0
     })
   }
-  if (expanded.length > 100) throw new Error('steps: максимум 100 шагов с Evidence Gates')
+  if (expanded.length > 100) throw new Error('steps: at most 100 steps including Evidence Gates')
   return expanded
 }
 
@@ -143,31 +143,31 @@ export function parseScenario(source: string, options: { expandEvidence?: boolea
     throw new Error(`YAML: ${error instanceof Error ? error.message : String(error)}`)
   }
   const raw = object(parsed, 'scenario')
-  if (!Array.isArray(raw.steps) || raw.steps.length === 0) throw new Error('steps: нужен хотя бы один шаг')
-  if (raw.steps.length > 50) throw new Error('steps: максимум 50 шагов')
+  if (!Array.isArray(raw.steps) || raw.steps.length === 0) throw new Error('steps: at least one step is required')
+  if (raw.steps.length > 50) throw new Error('steps: at most 50 steps')
   const roles = parseRoles(raw.roles)
   const steps = options.expandEvidence === false
     ? raw.steps.map((step, index) => stepFrom(step, index, roles))
     : expandEvidenceGates(raw.steps.map((step, index) => stepFrom(step, index, roles)))
   const byId = new Map<string, ScenarioStep>()
   for (const step of steps) {
-    if (byId.has(step.id)) throw new Error(`steps: повторяющийся id ${step.id}`)
+    if (byId.has(step.id)) throw new Error(`steps: duplicate id ${step.id}`)
     byId.set(step.id, step)
   }
   for (const step of steps) {
     if (new Set([step.agent, ...step.fallback]).size !== step.fallback.length + 1) {
-      throw new Error(`steps.${step.id}: агент не должен повторяться в fallback`)
+      throw new Error(`steps.${step.id}: fallback agents must be distinct and differ from the primary agent`)
     }
     for (const dependency of step.needs) {
-      if (!byId.has(dependency)) throw new Error(`steps.${step.id}: неизвестная зависимость ${dependency}`)
-      if (dependency === step.id) throw new Error(`steps.${step.id}: шаг зависит от себя`)
+      if (!byId.has(dependency)) throw new Error(`steps.${step.id}: unknown dependency ${dependency}`)
+      if (dependency === step.id) throw new Error(`steps.${step.id}: step depends on itself`)
     }
-    if (step.effort && !step.model) throw new Error(`steps.${step.id}: effort требует model`)
+    if (step.effort && !step.model) throw new Error(`steps.${step.id}: effort requires model`)
   }
   const visiting = new Set<string>()
   const visited = new Set<string>()
   const visit = (id: string) => {
-    if (visiting.has(id)) throw new Error(`steps: цикл зависимостей через ${id}`)
+    if (visiting.has(id)) throw new Error(`steps: dependency cycle through ${id}`)
     if (visited.has(id)) return
     visiting.add(id)
     for (const dependency of byId.get(id)!.needs) visit(dependency)
@@ -182,9 +182,9 @@ export function parseScenario(source: string, options: { expandEvidence?: boolea
   } : undefined
   for (const step of steps) validateAcceptance(step.acceptance, commandPolicy)
   const quotaThreshold = raw.quotaThreshold === undefined ? 95 : Number(raw.quotaThreshold)
-  if (!Number.isFinite(quotaThreshold) || quotaThreshold < 1 || quotaThreshold > 100) throw new Error('quotaThreshold: допустимо от 1 до 100')
+  if (!Number.isFinite(quotaThreshold) || quotaThreshold < 1 || quotaThreshold > 100) throw new Error('quotaThreshold: expected a value from 1 to 100')
   const prRaw = raw.pullRequest === undefined ? undefined : object(raw.pullRequest, 'pullRequest')
-  if (prRaw?.merge && !prRaw.mergeApproval) throw new Error('pullRequest.mergeApproval обязателен при merge')
+  if (prRaw?.merge && !prRaw.mergeApproval) throw new Error('pullRequest.mergeApproval is required to merge')
   const pullRequest = prRaw ? {
     base: text(prRaw.base, 'pullRequest.base'),
     merge: prRaw.merge === true,
@@ -211,16 +211,16 @@ export function serializeScenario(scenario: Scenario): string {
 export function taskSpec(step: ScenarioStep, handoff?: string): string {
   const acceptance = step.acceptance.map((command, index) => `${index + 1}. ${command}`).join('\n')
   const evidence = step.role === 'evidence'
-    ? 'Ты независимый reviewer, а не автор изменения. Вердикт SHIP означает worker_done succeeded. При исправимых проблемах верни FIX-FIRST и worker_done failed; при фундаментальных — BLOCKED и worker_done failed.'
+    ? 'Act as an independent reviewer. For SHIP, report worker_done succeeded. For fixable issues, return FIX-FIRST and report worker_done failed. For fundamental blockers, return BLOCKED and report worker_done failed.'
     : ''
   return [
     `Target: ${step.title}`,
     `Change: ${step.spec}`,
     evidence,
-    'Constraints: работай только в рамках этой задачи; не меняй завершённые шаги и не выполняй commit/push без отдельного указания.',
-    'Ownership: текущий назначенный workspace и файлы, необходимые для этого шага.',
-    `Observable acceptance: выполни каждую проверку и включи фактический результат в отчёт:\n${acceptance}`,
+    'Constraints: Stay within this task. Do not change completed steps, commit or push without separate authorization.',
+    'Ownership: Use the assigned workspace and the files needed for this step.',
+    `Observable acceptance: Run each check and report the actual result:\n${acceptance}`,
     handoff ? `Continuation checkpoint:\n${handoff}` : '',
-    'В начале работы и перед worker_done проверь непрочитанные сообщения coordinator: там может быть Continuation checkpoint. В worker_done укажи реальный outcome, краткий отчёт, изменённые файлы и результаты проверок; не объявляй успех при непройденной проверке.'
+    'Check for unread coordinator messages at the start and before sending worker_done. They may contain a continuation checkpoint. In worker_done, include the actual outcome, a brief report, the files changed and the check results. Report failure if any required check did not pass.'
   ].filter(Boolean).join('\n\n')
 }

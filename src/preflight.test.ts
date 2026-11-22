@@ -34,7 +34,7 @@ test('rejects an unavailable environment before any launch', async () => {
     stdout: JSON.stringify({ ok: true, result: { runtime: { state: 'unreachable', capabilities: [] } } }),
     stderr: ''
   }))
-  await assert.rejects(() => client.preflight(remoteStep()), /не готов/)
+  await assert.rejects(() => client.preflight(remoteStep()), /is not ready/)
 })
 
 test('rejects model overrides when the remote lacks launch preferences', async () => {
@@ -43,7 +43,7 @@ test('rejects model overrides when the remote lacks launch preferences', async (
     stdout: JSON.stringify({ ok: true, result: { runtime: { state: 'ready', capabilities: [] } } }),
     stderr: ''
   }))
-  await assert.rejects(() => client.preflight(remoteStep('    model: gpt-test\n')), /model\/effort/)
+  await assert.rejects(() => client.preflight(remoteStep('    model: gpt-test\n')), /model or effort/)
 })
 
 test('checks an exact remote workspace instead of substituting a local path', async () => {

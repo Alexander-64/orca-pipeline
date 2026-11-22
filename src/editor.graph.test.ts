@@ -27,7 +27,7 @@ test('insert and duplicate allocate unique IDs after deletion', () => {
   const graph = deleteStep(insertStep(base()), 'review')
   const next = insertStep(graph, undefined, 'implement')
   assert.equal(next.steps.at(-1)?.id, 'step-4')
-  assert.equal(next.steps.at(-1)?.title, 'Реализация (копия)')
+  assert.equal(next.steps.at(-1)?.title, 'Implementation (copy)')
   assert.equal(new Set(next.steps.map(step => step.id)).size, next.steps.length)
 })
 

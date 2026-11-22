@@ -9,11 +9,11 @@ export const demoRun: PipelineRun = {
   workspacePath: '/tmp/demo',
   scenario: {
     name: 'demo-pipeline',
-    objective: 'Проверить pipeline',
+    objective: 'Verify the pipeline',
     steps: [{
       id: 'build',
-      title: 'Реализация',
-      spec: 'Внести изменение и запустить проверки',
+      title: 'Implementation',
+      spec: 'Make the change and run the checks',
       needs: [],
       agent: 'codex',
       fallback: ['claude'],
@@ -36,7 +36,7 @@ export const demoRun: PipelineRun = {
         agent: 'codex',
         status: 'running',
         startedAt: '2026-11-10T12:00:00.000Z',
-        output: 'Выполняются проверки…'
+        output: 'Running checks…'
       }]
     }
   },
@@ -46,7 +46,7 @@ export const demoRun: PipelineRun = {
 
 export const demoDashboard: Dashboard = {
   runs: [],
-  beads: [{ id: 'bd-demo1', title: 'Реализация', status: 'in_progress', priority: 2, issueType: 'task' }],
+  beads: [{ id: 'bd-demo1', title: 'Implementation', status: 'in_progress', priority: 2, issueType: 'task' }],
   workspaces: [{ id: 'workspace-1', kind: 'worktree', name: 'Demo', path: '/tmp/demo', branch: 'main', hostId: null }],
   metrics: metricsForRuns([])
 }

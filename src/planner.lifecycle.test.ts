@@ -110,7 +110,7 @@ test('planner reports a clipped transcript honestly when task result is unusable
   await h.planner.tick(plan.id)
   assert.equal(plan.status, 'failed')
   assert.equal(plan.source, undefined)
-  assert.match(plan.error ?? '', /Planner не вернул fenced YAML-блок/)
+  assert.match(plan.error ?? '', /Planner returned no fenced YAML block/)
   assert.deepEqual(h.outputCalls, ['dispatch_plan'])
   assert.deepEqual(h.releases, [])
 })

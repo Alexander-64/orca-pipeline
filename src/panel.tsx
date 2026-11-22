@@ -64,14 +64,14 @@ const busy = atom(false)
 const error = atom<string | null>(null)
 
 const STATUS: Record<StepStatus, { label: string; tone: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' }> = {
-  pending: { label: 'Ожидает', tone: 'neutral' },
-  ready: { label: 'Готов', tone: 'accent' },
-  running: { label: 'Выполняется', tone: 'accent' },
-  retrying: { label: 'Переключение', tone: 'warning' },
-  done: { label: 'Готово', tone: 'success' },
-  failed: { label: 'Ошибка', tone: 'danger' },
-  blocked: { label: 'Заблокирован', tone: 'warning' },
-  superseded: { label: 'Заменено', tone: 'neutral' }
+  pending: { label: 'Pending', tone: 'neutral' },
+  ready: { label: 'Ready', tone: 'accent' },
+  running: { label: 'Running', tone: 'accent' },
+  retrying: { label: 'Switching agent', tone: 'warning' },
+  done: { label: 'Done', tone: 'success' },
+  failed: { label: 'Error', tone: 'danger' },
+  blocked: { label: 'Blocked', tone: 'warning' },
+  superseded: { label: 'Superseded', tone: 'neutral' }
 }
 
 function message(value: unknown): string {
@@ -144,16 +144,16 @@ function PlannerSummary() {
     <Stack gap="xs">
       <Badge tone={current.status === 'failed' ? 'danger' : current.status === 'done' ? 'success' : 'accent'}>{current.status}</Badge>
       <KeyValue items={[
-        { label: 'Цель planner', value: current.objective ?? read(objective) },
-        { label: 'Агент planner', value: current.agent },
+        { label: 'Planner objective', value: current.objective ?? read(objective) },
+        { label: 'Planner agent', value: current.agent },
         { label: 'Run ID', value: current.runId }
       ]} />
       {current.error ? <Callout title="Planner error" tone="danger"><Text>{current.error}</Text></Callout> : null}
       {summary ? <KeyValue items={[
         { label: 'Scenario name', value: summary.name },
         { label: 'Scenario objective', value: summary.objective },
-        { label: 'Шагов', value: summary.steps.length },
-        { label: 'Волн', value: waves(summary.steps).length }
+        { label: 'Steps', value: summary.steps.length },
+        { label: 'Waves', value: waves(summary.steps).length }
       ]} /> : null}
     </Stack>
   </Card>
@@ -188,7 +188,7 @@ async function action(callback: () => Promise<void>): Promise<void> {
 async function generatePlan(): Promise<void> {
   await action(async () => {
     const id = read(workspaceId)
-    if (!id) throw new Error('Выберите workspace')
+    if (!id) throw new Error('Select a workspace')
     const answer = await plugin.request('plan.start', {
       workspaceId: id,
       objective: read(objective),
@@ -201,7 +201,7 @@ async function generatePlan(): Promise<void> {
 async function start(): Promise<void> {
   await action(async () => {
     const id = read(workspaceId)
-    if (!id) throw new Error('Выберите workspace')
+    if (!id) throw new Error('Select a workspace')
     const { run } = await plugin.request('run.start', { workspaceId: id, source: read(draft) }, { timeoutMs: 120_000 })
     set(runId, run.id)
     set(tab, 'runs')
@@ -241,29 +241,29 @@ function StepEditor() {
   const locked = !!read(draftError)
   return <Card title={`Inspector · ${step.id}`}>
     <Stack gap="sm">
-      <Input label="Название шага" value={step.title} onChange={title => updateInspector({ title })} />
-      <Textarea label="Задание шага" rows={4} value={step.spec} onChange={spec => updateInspector({ spec })} />
+      <Input label="Step title" value={step.title} onChange={title => updateInspector({ title })} />
+      <Textarea label="Step instructions" rows={4} value={step.spec} onChange={spec => updateInspector({ spec })} />
       <Select label={`Agent ${step.id}`} value={step.agent}
         options={agentOptions(read(data)?.agents, [step.agent])}
         onChange={agent => updateInspector({ agent, fallback: step.fallback.filter(value => value !== agent), reviewAgent: step.reviewAgent === agent ? undefined : step.reviewAgent })} />
-      <Text size="sm">Fallback · порядок выбора задаёт порядок попыток</Text>
+      <Text size="sm">Fallback agents run in selection order</Text>
       {agentOptions(read(data)?.agents, step.fallback).filter(option => option.value !== step.agent).map(option => <Checkbox
         label={`Fallback ${step.id}: ${option.label}`} checked={step.fallback.includes(option.value)}
         onChange={checked => updateInspector({ fallback: checked ? [...step.fallback, option.value] : step.fallback.filter(id => id !== option.value) })} />)}
       <Select label="Review agent" value={step.reviewAgent ?? 'none'}
-        options={[{ value: 'none', label: 'Без Evidence Gate' }, ...agentOptions(read(data)?.agents, [step.reviewAgent ?? '']).filter(option => option.value !== step.agent)]}
+        options={[{ value: 'none', label: 'No Evidence Gate' }, ...agentOptions(read(data)?.agents, [step.reviewAgent ?? '']).filter(option => option.value !== step.agent)]}
         onChange={value => updateInspector({ reviewAgent: value === 'none' ? undefined : value })} />
-      <Textarea label="Acceptance — команда на строку" rows={3} value={step.acceptance.join('\n')} onChange={value => updateInspector({ acceptance: value.split('\n').filter(item => item.trim()) })} />
-      <Text size="sm">Зависимости · дождаться завершения</Text>
+      <Textarea label="Acceptance checks, one command per line" rows={3} value={step.acceptance.join('\n')} onChange={value => updateInspector({ acceptance: value.split('\n').filter(item => item.trim()) })} />
+      <Text size="sm">Wait for these steps</Text>
       {scenario.steps.filter(candidate => candidate.id !== step.id).map(candidate => <Checkbox
-        label={`После ${candidate.id}`} checked={step.needs.includes(candidate.id)}
+        label={`After ${candidate.id}`} checked={step.needs.includes(candidate.id)}
         onChange={checked => updateInspector({ needs: checked ? [...step.needs, candidate.id] : step.needs.filter(id => id !== candidate.id) })} />)}
-      {scenario.steps.length === 1 ? <Text muted>Других шагов пока нет</Text> : null}
-      <Text muted size="xs">Изменения применяются кнопкой; циклы и некорректные настройки будут отклонены.</Text>
+      {scenario.steps.length === 1 ? <Text muted>No other steps yet</Text> : null}
+      <Text muted size="xs">Apply the step to save changes. Cycles and invalid settings are rejected.</Text>
       <Row gap="xs" wrap>
-        <Button disabled={locked} onPress={() => mutateGraph(graph => patchStep(graph, step.id, step))}>Применить шаг</Button>
-        <Button variant="ghost" onPress={() => selectNode(step.id)}>Сбросить поля</Button>
-        <Button variant="ghost" tone="danger" disabled={locked || scenario.steps.length === 1} onPress={() => mutateGraph(graph => deleteStep(graph, step.id))}>Удалить {step.id}</Button>
+        <Button disabled={locked} onPress={() => mutateGraph(graph => patchStep(graph, step.id, step))}>Apply step</Button>
+        <Button variant="ghost" onPress={() => selectNode(step.id)}>Reset fields</Button>
+        <Button variant="ghost" tone="danger" disabled={locked || scenario.steps.length === 1} onPress={() => mutateGraph(graph => deleteStep(graph, step.id))}>Delete {step.id}</Button>
       </Row>
     </Stack>
   </Card>
@@ -276,23 +276,23 @@ function GraphEditor() {
   const locked = !!read(draftError)
   return <Stack gap="sm">
     <Row gap="sm" wrap>
-      <Heading level={2}>DAG-редактор</Heading>
-      <Badge>{scenario.steps.length} шагов</Badge><Badge>{layers.length} волн</Badge>
-      <Badge>{new Set(scenario.steps.map(step => step.agent)).size} агентов</Badge>
-      <Button size="sm" variant="outline" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph), true)}>Добавить шаг</Button>
-      <Button size="sm" variant="outline" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph, read(editorSelection)), true)}>Добавить дочерний</Button>
-      <Button size="sm" variant="ghost" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph, undefined, read(editorSelection)), true)}>Дублировать</Button>
+      <Heading level={2}>DAG editor</Heading>
+      <Badge>{scenario.steps.length} steps</Badge><Badge>{layers.length} waves</Badge>
+      <Badge>{new Set(scenario.steps.map(step => step.agent)).size} agents</Badge>
+      <Button size="sm" variant="outline" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph), true)}>Add step</Button>
+      <Button size="sm" variant="outline" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph, read(editorSelection)), true)}>Add dependent step</Button>
+      <Button size="sm" variant="ghost" disabled={locked} onPress={() => mutateGraph(graph => insertStep(graph, undefined, read(editorSelection)), true)}>Duplicate</Button>
     </Row>
     <Grid minItemWidth="lg" gap="md">
       <Stack gap="md">
         {layers.map((layer, index) => <Stack gap="sm">
-          <Heading level={3}>{`Волна ${index + 1} · ${layer.length === 1 ? 'последовательно' : 'параллельно'}`}</Heading>
+          <Heading level={3}>{`Wave ${index + 1} · ${layer.length === 1 ? 'sequential' : 'parallel'}`}</Heading>
           <Grid minItemWidth="sm" gap="sm">
             {layer.map(step => <Box padding="sm" radius="md" border={read(editorSelection) === step.id ? 'accent' : true} background={read(editorSelection) === step.id ? 'accent' : 'card'}>
               <Button size="sm" variant="ghost" onPress={() => selectNode(step.id)}>{step.title}</Button>
               <Text size="xs">{step.id} · {step.agent}</Text>
-              {read(editorSelection) === step.id ? <Badge tone="accent">Выбран</Badge> : null}
-              <Text size="sm">{step.needs.length ? `После: ${step.needs.join(', ')}` : 'Независимый старт'}</Text>
+              {read(editorSelection) === step.id ? <Badge tone="accent">Selected</Badge> : null}
+              <Text size="sm">{step.needs.length ? `After: ${step.needs.join(', ')}` : 'No dependencies'}</Text>
               <Row gap="xs" wrap>
                 {step.fallback.length ? <Badge tone="warning">{`Fallback: ${step.fallback.join(' → ')}`}</Badge> : null}
                 {step.reviewAgent ? <Badge tone="accent">{`Evidence Gate: ${step.reviewAgent}`}</Badge> : null}
@@ -314,15 +314,15 @@ function ScenarioView() {
   return (
     <Stack gap="md">
       <Stack gap="xs">
-        <Heading level={2}>Новый pipeline</Heading>
-        <Text muted size="sm">YAML → Orca DAG → проверка → Beads. Запуск не меняет сценарий после старта.</Text>
+        <Heading level={2}>New pipeline</Heading>
+        <Text muted size="sm">YAML → Orca DAG → checks → Beads. Each run uses the scenario as it was at launch.</Text>
       </Stack>
       <Grid minItemWidth="sm" gap="sm">
         <Select
           label="Workspace"
           value={read(workspaceId)}
           options={dashboard?.workspaces.map((workspace) => ({ value: workspace.id, label: `${workspace.name} · ${workspace.branch ?? workspace.kind}` })) ?? []}
-          placeholder="Выберите workspace"
+          placeholder="Select a workspace"
           onChange={(value) => {
             set(workspaceId, value)
             set(plan, null)
@@ -330,11 +330,11 @@ function ScenarioView() {
           }}
         />
         <Select
-          label="Шаблон"
+          label="Template"
           value={read(template)}
           options={[
-            { value: 'custom', label: 'Свой сценарий' },
-            { value: 'implement-review', label: 'Реализация → Evidence Gate' },
+            { value: 'custom', label: 'Custom scenario' },
+            { value: 'implement-review', label: 'Implementation → Evidence Gate' },
             { value: 'bugfix-regression', label: 'Bugfix → regression test' },
             { value: 'research-design', label: 'Research → design → implementation' }
           ]}
@@ -355,29 +355,29 @@ function ScenarioView() {
             await plugin.request('scenario.validate', { source: read(draft) })
             syncDraft(read(draft))
           })}
-        >Проверить YAML</Button>
-        <Button icon="play" disabled={disabled} onPress={start}>Запустить</Button>
-        <Button variant="ghost" icon="refresh" disabled={read(busy)} onPress={() => refresh()}>Обновить</Button>
+        >Validate YAML</Button>
+        <Button icon="play" disabled={disabled} onPress={start}>Start</Button>
+        <Button variant="ghost" icon="refresh" disabled={read(busy)} onPress={() => refresh()}>Refresh</Button>
       </Row>
-      {read(draftError) ? <Callout tone="danger" title="YAML невалиден · показан последний валидный DAG"><Text>{read(draftError)}</Text></Callout> : null}
-      {read(editError) ? <Callout tone="danger" title="Изменение не применено"><Text>{read(editError)}</Text></Callout> : null}
+      {read(draftError) ? <Callout tone="danger" title="Invalid YAML. Showing the last valid DAG"><Text>{read(draftError)}</Text></Callout> : null}
+      {read(editError) ? <Callout tone="danger" title="Changes could not be applied"><Text>{read(editError)}</Text></Callout> : null}
       <PlannerSummary />
-      <Card title={read(validated)?.name ?? 'Сценарий'} description={read(validated)?.objective}>
+      <Card title={read(validated)?.name ?? 'Scenario'} description={read(validated)?.objective}>
         <Stack gap="sm">
           <Input label="Scenario name" value={read(scenarioName)} onChange={value => set(scenarioName, value)} />
           <Textarea label="Scenario objective" rows={2} value={read(scenarioObjective)} onChange={value => set(scenarioObjective, value)} />
-          <Button disabled={!!read(draftError)} onPress={() => mutateGraph(graph => ({ ...graph, name: read(scenarioName), objective: read(scenarioObjective) }))}>Применить название и цель</Button>
+          <Button disabled={!!read(draftError)} onPress={() => mutateGraph(graph => ({ ...graph, name: read(scenarioName), objective: read(scenarioObjective) }))}>Apply name and objective</Button>
         </Stack>
       </Card>
-      <RadioGroup label="Вид редактора" orientation="horizontal" value={read(viewMode)} options={[{ value: 'map', label: 'Карта' }, { value: 'yaml', label: 'YAML' }, { value: 'split', label: 'Рядом' }]} onChange={value => set(viewMode, value)} />
+      <RadioGroup label="Editor view" orientation="horizontal" value={read(viewMode)} options={[{ value: 'map', label: 'Map' }, { value: 'yaml', label: 'YAML' }, { value: 'split', label: 'Side by side' }]} onChange={value => set(viewMode, value)} />
       <Grid minItemWidth="lg" gap="md">
         {read(viewMode) !== 'yaml' ? <Box maxHeight={360} scroll="y"><GraphEditor /></Box> : null}
-        {read(viewMode) !== 'map' ? <Box maxHeight={360} scroll="y"><Textarea label="YAML-сценарий" rows={12} value={read(draft)} onChange={syncDraft} /></Box> : null}
+        {read(viewMode) !== 'map' ? <Box maxHeight={360} scroll="y"><Textarea label="YAML scenario" rows={12} value={read(draft)} onChange={syncDraft} /></Box> : null}
       </Grid>
       {read(viewMode) !== 'yaml' ? <StepEditor /> : null}
-      <Collapsible title="Составить сценарий агентом">
+      <Collapsible title="Plan a scenario with an agent">
         <Stack gap="sm">
-          <Textarea label="Цель" rows={3} value={read(objective)} placeholder="Что нужно сделать и как проверить результат?" onChange={(value) => set(objective, value)} />
+          <Textarea label="Objective" rows={3} value={read(objective)} placeholder="What should the agent do, and how will you verify the result?" onChange={(value) => set(objective, value)} />
           <Row gap="sm" align="end" wrap>
             <Select
               label="Planner"
@@ -385,15 +385,15 @@ function ScenarioView() {
               options={agentOptions(read(data)?.agents, [read(plannerAgent)])}
               onChange={(value) => set(plannerAgent, value)}
             />
-            <Button variant="outline" icon="agent" disabled={disabled || read(plan)?.status === 'running'} onPress={generatePlan}>Составить YAML</Button>
-            {read(plan)?.status === 'running' ? <Badge tone="accent">Planner работает…</Badge> : null}
-            {read(plan)?.status === 'done' ? <Badge tone="success">YAML обновлён</Badge> : null}
+            <Button variant="outline" icon="agent" disabled={disabled || read(plan)?.status === 'running'} onPress={generatePlan}>Generate YAML</Button>
+            {read(plan)?.status === 'running' ? <Badge tone="accent">Planner is running…</Badge> : null}
+            {read(plan)?.status === 'done' ? <Badge tone="success">YAML updated</Badge> : null}
           </Row>
           {read(plan)?.error ? <Callout tone="danger" title="Planner"><Text>{read(plan)?.error}</Text></Callout> : null}
         </Stack>
       </Collapsible>
-      <Callout title="Проверка результата" icon="info">
-        <Text size="sm">Каждый шаг обязан выполнить acceptance-команды и отправить worker_done. Перед failover старый Dispatch останавливается и получает новый continuation checkpoint.</Text>
+      <Callout title="Verifying results" icon="info">
+        <Text size="sm">Each step must run its acceptance checks and send worker_done. Failover stops the previous Dispatch and creates a continuation checkpoint for the next attempt.</Text>
       </Callout>
     </Stack>
   )
@@ -416,9 +416,9 @@ function AttemptsView({ run }: { run: PipelineRun }) {
           { label: 'Workspace', value: step.placement.worktree },
           { label: 'Fallback', value: step.fallback.join(' → ') || '—' }
         ]} />
-        {task.error ? <Callout tone="danger" title="Ошибка"><Text>{task.error}</Text></Callout> : null}
+        {task.error ? <Callout tone="danger" title="Error"><Text>{task.error}</Text></Callout> : null}
         {task.gateId && task.status === 'blocked' ? (
-          <Callout tone="warning" title="Нужно решение">
+          <Callout tone="warning" title="Decision required">
             <Stack gap="sm">
               <Text size="sm">{step.approval}</Text>
               <Row gap="sm">
@@ -432,7 +432,7 @@ function AttemptsView({ run }: { run: PipelineRun }) {
                       const answer = await plugin.request('run.resolve-gate', { id: run.id, stepId: step.id, resolution })
                       update(data, (previous) => previous ? { ...previous, runs: previous.runs.map((item) => item.id === run.id ? answer.run : item) } : previous)
                     })}
-                  >{resolution === 'approve' ? 'Разрешить' : 'Отклонить'}</Button>
+                  >{resolution === 'approve' ? 'Approve' : 'Reject'}</Button>
                 ))}
               </Row>
             </Stack>
@@ -448,9 +448,9 @@ function AttemptsView({ run }: { run: PipelineRun }) {
               const answer = await plugin.request('run.switch-agent', { id: run.id, stepId: step.id })
               update(data, (previous) => previous ? { ...previous, runs: previous.runs.map((item) => item.id === run.id ? answer.run : item) } : previous)
             })}
-          >Остановить и сменить агента</Button>
+          >Stop and switch agent</Button>
         ) : null}
-        <Collapsible title={`Попытки: ${task.attempts.length}`} defaultOpen={task.attempts.length > 1}>
+        <Collapsible title={`Attempts: ${task.attempts.length}`} defaultOpen={task.attempts.length > 1}>
           <List>
             {task.attempts.map((attempt, index) => (
               <ListItem
@@ -460,7 +460,7 @@ function AttemptsView({ run }: { run: PipelineRun }) {
             ))}
           </List>
         </Collapsible>
-        {last?.output ? <Collapsible title="Последний вывод"><CodeView code={last.output} maxHeight="md" wrap /></Collapsible> : null}
+        {last?.output ? <Collapsible title="Latest output"><CodeView code={last.output} maxHeight="md" wrap /></Collapsible> : null}
         <Collapsible title="Acceptance">
           <List>{step.acceptance.map((command) => <ListItem title={command} icon="check" />)}</List>
         </Collapsible>
@@ -471,14 +471,14 @@ function AttemptsView({ run }: { run: PipelineRun }) {
 
 function RunsView() {
   const dashboard = read(data)
-  if (!dashboard?.runs.length) return <EmptyState icon="activity" title="Запусков пока нет" description="Проверьте YAML и запустите первый pipeline на вкладке «Сценарий»." />
+  if (!dashboard?.runs.length) return <EmptyState icon="activity" title="No runs yet" description="Validate the YAML and start your first pipeline from the Scenario tab." />
   const run = selectedRun()!
   const tasks = run.scenario.steps.map((step) => run.tasks[step.id]).filter(Boolean)
   const completed = tasks.filter((task) => task.status === 'done' || task.status === 'superseded').length
   return (
     <Stack gap="md">
       <Select
-        label="Запуск"
+        label="Run"
         value={run.id}
         options={dashboard.runs.map((item) => ({ value: item.id, label: `${item.scenario.name} · ${item.status}` }))}
         onChange={(value) => {
@@ -493,18 +493,18 @@ function RunsView() {
         </Stack>
         <Badge tone={run.status === 'done' ? 'success' : run.status === 'failed' ? 'danger' : 'accent'}>{run.status}</Badge>
       </Row>
-      <Progress label={`${completed} из ${tasks.length}`} value={tasks.length ? completed / tasks.length : 0} />
+      <Progress label={`${completed} of ${tasks.length}`} value={tasks.length ? completed / tasks.length : 0} />
       {run.pr ? <Callout tone={run.pr.status === 'failed' ? 'danger' : run.pr.status === 'merged' ? 'success' : 'accent'} title={`PR: ${run.pr.status}`}><Text size="sm">{run.pr.url}</Text></Callout> : null}
       <Row gap="xs" wrap>
-        {run.status === 'running' ? <Button size="sm" variant="outline" icon="pause" onPress={() => runCommand('pause', run.id)}>Пауза</Button> : null}
-        {run.status === 'paused' ? <Button size="sm" icon="play" onPress={() => runCommand('resume', run.id)}>Продолжить</Button> : null}
-        {run.status === 'failed' ? <Button size="sm" icon="next" onPress={() => runCommand('retry', run.id)}>Следующий fallback</Button> : null}
-        <Button size="sm" variant="ghost" icon="refresh" onPress={() => runCommand('tick', run.id)}>Обновить</Button>
-        {run.status === 'running' || run.status === 'paused' ? <Button size="sm" variant="ghost" tone="danger" icon="stop" onPress={() => runCommand('cancel', run.id)}>Остановить</Button> : null}
+        {run.status === 'running' ? <Button size="sm" variant="outline" icon="pause" onPress={() => runCommand('pause', run.id)}>Pause</Button> : null}
+        {run.status === 'paused' ? <Button size="sm" icon="play" onPress={() => runCommand('resume', run.id)}>Resume</Button> : null}
+        {run.status === 'failed' ? <Button size="sm" icon="next" onPress={() => runCommand('retry', run.id)}>Try next fallback</Button> : null}
+        <Button size="sm" variant="ghost" icon="refresh" onPress={() => runCommand('tick', run.id)}>Refresh</Button>
+        {run.status === 'running' || run.status === 'paused' ? <Button size="sm" variant="ghost" tone="danger" icon="stop" onPress={() => runCommand('cancel', run.id)}>Stop</Button> : null}
       </Row>
       {run.error ? <Callout tone="danger" title="Coordinator"><Text>{run.error}</Text></Callout> : null}
       <Separator />
-      <List label="DAG и статусы шагов">
+      <List label="DAG and step status">
         {run.scenario.steps.map((step) => {
           const task = run.tasks[step.id]
           if (!task) return null
@@ -512,7 +512,7 @@ function RunsView() {
             <ListItem
               current={read(stepId) === step.id}
               title={`${step.title}  ·  ${task.agent}`}
-              description={`${STATUS[task.status].label}${step.needs.length ? ` · после ${step.needs.join(', ')}` : ''} · попыток ${task.attempts.length}`}
+              description={`${STATUS[task.status].label}${step.needs.length ? ` · after ${step.needs.join(', ')}` : ''} · attempts ${task.attempts.length}`}
               icon={task.status === 'done' ? 'check' : task.status === 'failed' ? 'error' : 'agent'}
               onPress={() => set(stepId, step.id)}
             />
@@ -526,36 +526,36 @@ function RunsView() {
 
 function MetricsView() {
   const dashboard = read(data)
-  if (!dashboard) return <EmptyState icon="bar-chart-3" title="Нет метрик" description="Запустите pipeline, чтобы увидеть статистику" />
+  if (!dashboard) return <EmptyState icon="bar-chart-3" title="No metrics" description="Start a pipeline to see metrics" />
   const metrics = dashboard.metrics
   const minutes = Math.round(metrics.durationMs / 60_000)
   return (
     <Stack gap="md">
-      <Heading level={2}>Метрики</Heading>
+      <Heading level={2}>Metrics</Heading>
       <KeyValue items={[
-        { label: 'Длительность', value: `${minutes} мин` },
-        { label: 'Попытки', value: metrics.attempts },
+        { label: 'Duration', value: `${minutes} min` },
+        { label: 'Attempts', value: metrics.attempts },
         { label: 'Failovers', value: metrics.failovers },
-        { label: 'Шаги', value: `${metrics.completedSteps}/${metrics.totalSteps}` },
-        { label: 'Успех', value: `${metrics.successRate}%` }
+        { label: 'Steps', value: `${metrics.completedSteps}/${metrics.totalSteps}` },
+        { label: 'Success', value: `${metrics.successRate}%` }
       ]} />
       <Table
-        label="По агентам"
+        label="By agent"
         columns={[
-          { key: 'agent', label: 'Агент' },
-          { key: 'attempts', label: 'Попытки', width: 'sm' },
-          { key: 'succeeded', label: 'Успех', width: 'sm' },
-          { key: 'failed', label: 'Ошибки', width: 'sm' }
+          { key: 'agent', label: 'Agent' },
+          { key: 'attempts', label: 'Attempts', width: 'sm' },
+          { key: 'succeeded', label: 'Success', width: 'sm' },
+          { key: 'failed', label: 'Failures', width: 'sm' }
         ]}
         rows={metrics.byAgent.map((row) => ({ key: row.agent, cells: row }))}
-        emptyText="Попыток пока нет"
+        emptyText="No attempts yet"
       />
-      <Collapsible title="Timeline по Runs">
+      <Collapsible title="Run timeline">
         <List>
           {dashboard.runs.map((run) => (
             <ListItem
               title={`${run.scenario.name} · ${run.status}`}
-              description={`${run.createdAt} → ${run.updatedAt} · ${Object.values(run.tasks).reduce((sum, task) => sum + task.attempts.length, 0)} попыток`}
+              description={`${run.createdAt} → ${run.updatedAt} · ${Object.values(run.tasks).reduce((sum, task) => sum + task.attempts.length, 0)} attempts`}
               icon="activity"
             />
           ))}
@@ -582,20 +582,20 @@ function BeadsView() {
     <Stack gap="md">
       <Row justify="between" align="center">
         <Heading level={2}>Beads</Heading>
-        <Button size="sm" variant="ghost" icon="refresh" onPress={() => refresh()}>Обновить</Button>
+        <Button size="sm" variant="ghost" icon="refresh" onPress={() => refresh()}>Refresh</Button>
       </Row>
-      <Input label="Поиск по задачам" type="search" value={read(beadSearch)} placeholder="Название или ID" onChange={(value) => set(beadSearch, value)} />
+      <Input label="Search tasks" type="search" value={read(beadSearch)} placeholder="Title or ID" onChange={(value) => set(beadSearch, value)} />
       <Row gap="sm" wrap>
         <Select
-          label="Статус"
+          label="Status"
           value={status}
-          options={['all', 'open', 'in_progress', 'blocked', 'closed'].map((value) => ({ value, label: value === 'all' ? 'Все' : value }))}
+          options={['all', 'open', 'in_progress', 'blocked', 'closed'].map((value) => ({ value, label: value === 'all' ? 'All' : value }))}
           onChange={(value) => set(beadStatus, value)}
         />
         <Select
           label="Epic"
           value={epic}
-          options={[{ value: 'all', label: 'Все epics' }, ...epics.map((item) => ({ value: item.id, label: item.title }))]}
+          options={[{ value: 'all', label: 'All epics' }, ...epics.map((item) => ({ value: item.id, label: item.title }))]}
           onChange={(value) => set(beadEpic, value)}
         />
       </Row>
@@ -604,29 +604,29 @@ function BeadsView() {
           {epics.map((item) => {
             const children = all.filter((bead) => bead.parentId === item.id)
             const closed = children.filter((bead) => bead.status === 'closed').length
-            return <ListItem title={item.title} description={`${closed}/${children.length} закрыто`} icon="layers" />
+            return <ListItem title={item.title} description={`${closed}/${children.length} closed`} icon="layers" />
           })}
         </List>
       ) : null}
       {dashboard?.beadsError ? (
-        <Callout tone="warning" title="bd недоступен">
-          <Text size="sm">{dashboard.beadsError}. Укажите путь к bd в Settings → Plugins → Agent Pipeline.</Text>
+        <Callout tone="warning" title="bd is unavailable">
+          <Text size="sm">{dashboard.beadsError}. Set the path to bd in Settings → Plugins → Agent Pipeline.</Text>
         </Callout>
       ) : null}
-      <Text muted size="xs">По строке: claim или close; по закрытой — reopen.</Text>
+      <Text muted size="xs">Select a row to claim or close the task. Select a closed task to reopen it.</Text>
       <Table
-        label="Задачи Beads"
+        label="Beads tasks"
         columns={[
-          { key: 'status', label: 'Статус', width: 'sm' },
-          { key: 'title', label: 'Задача' },
-          { key: 'type', label: 'Тип', width: 'xs', hideBelow: 'sm' },
+          { key: 'status', label: 'Status', width: 'sm' },
+          { key: 'title', label: 'Task' },
+          { key: 'type', label: 'Type', width: 'xs', hideBelow: 'sm' },
           { key: 'priority', label: 'P', width: 'xs', hideBelow: 'sm' }
         ]}
         rows={beads.map((bead) => ({
           key: bead.id,
           cells: { status: bead.status, title: `${bead.title} · ${bead.id}`, type: bead.issueType ?? 'task', priority: bead.priority ?? '—' }
         }))}
-        emptyText="Задачи не найдены"
+        emptyText="No matching tasks"
         maxHeight="lg"
         onRowAction={({ key }) => {
           const bead = all.find((candidate) => candidate.id === key)
@@ -656,13 +656,13 @@ export default function Panel() {
     <Stack gap="md">
       <Row justify="between" align="center">
         <Heading>Agent Pipeline</Heading>
-        {read(busy) ? <Badge tone="accent">Работаю…</Badge> : null}
+        {read(busy) ? <Badge tone="accent">Working…</Badge> : null}
       </Row>
-      {read(error) ? <Callout tone="danger" title="Ошибка"><Text>{read(error)}</Text></Callout> : null}
+      {read(error) ? <Callout tone="danger" title="Error"><Text>{read(error)}</Text></Callout> : null}
       <Tabs label="Agent Pipeline" value={read(tab)} onChange={(value) => set(tab, value)}>
-        <Tab value="scenario" label="Сценарий" icon="file-text"><ScenarioView /></Tab>
-        <Tab value="runs" label="Выполнение" icon="activity"><RunsView /></Tab>
-        <Tab value="metrics" label="Метрики" icon="bar-chart-3"><MetricsView /></Tab>
+        <Tab value="scenario" label="Scenario" icon="file-text"><ScenarioView /></Tab>
+        <Tab value="runs" label="Runs" icon="activity"><RunsView /></Tab>
+        <Tab value="metrics" label="Metrics" icon="bar-chart-3"><MetricsView /></Tab>
         <Tab value="beads" label="Beads" icon="book"><BeadsView /></Tab>
       </Tabs>
       {read(busy) ? null : null}

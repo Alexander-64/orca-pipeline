@@ -50,9 +50,9 @@ export function handoffFor(step: ScenarioStep, attempts: Attempt[]): string {
   return [
     'Continuation checkpoint v1',
     `Step: ${step.id} — ${step.title}`,
-    'Продолжи в том же workspace с текущего состояния. Не начинай задачу заново и не повторяй подтверждённую работу. Сначала проверь git status/diff и существующие артефакты.',
-    `Acceptance, требующий подтверждения:\n${step.acceptance.map((command) => `- ${command}`).join('\n')}`,
-    `Attempts:\n${history || 'Предыдущий вывод недоступен.'}`,
-    'После продолжения приложи к worker_done список изменённых файлов и фактические результаты всех проверок.'
+    'Resume from the current state in the same workspace. Do not restart the task or repeat verified work. First check git status, the diff and existing artifacts.',
+    `Acceptance checks to verify:\n${step.acceptance.map((command) => `- ${command}`).join('\n')}`,
+    `Attempts:\n${history || 'Previous output is unavailable.'}`,
+    'Include the files changed and the actual results of all checks in worker_done.'
   ].join('\n\n').slice(0, 12_000)
 }

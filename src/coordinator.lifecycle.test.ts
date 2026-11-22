@@ -105,7 +105,7 @@ test('quota without a fallback leaves a useful failure and no duplicate', async 
   h.statuses.set('task_a', 'failed')
   await h.coordinator.tick(run.id)
   assert.equal(run.status, 'failed')
-  assert.match(run.tasks.a.error ?? '', /Лимит исчерпан/)
+  assert.match(run.tasks.a.error ?? '', /Quota exhausted/)
   assert.equal(h.starts.length, 1)
 })
 
@@ -182,7 +182,7 @@ test('retry refuses a failed run with no remaining fallback before binding', asy
 `))
   h.statuses.set('task_a', 'failed')
   await h.coordinator.tick(run.id)
-  await assert.rejects(() => h.coordinator.retry(run.id), /не осталось fallback/)
+  await assert.rejects(() => h.coordinator.retry(run.id), /has no fallback/)
   assert.equal(h.state.binds, 0)
   assert.equal(h.starts.length, 1)
 })

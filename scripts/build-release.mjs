@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // Explicit production inventory: new runtime modules must be reviewed here.
 const modules = 'agents artifacts beads capacity cli commands coordinator editor failover metrics mutations planner pr protocol quota scenario templates types usage worker'.split(' ')
-const required = ['orca-plugin.json', 'README.md', 'README.en.md', 'README.zh-CN.md', ...modules.map(name => `src/${name}.ts`), 'src/panel.tsx']
+const required = ['orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', ...modules.map(name => `src/${name}.ts`), 'src/panel.tsx']
 
 async function exists(file) {
   try { return await lstat(file) } catch (error) { if (error.code === 'ENOENT') return null; throw error }

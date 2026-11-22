@@ -32,6 +32,6 @@ export function chooseAvailableAgent(
   const agent = available[0]
   return {
     agent,
-    reason: agent ? `${agent}: выбран по актуальной квоте (порог ${threshold}%)` : 'Нет агента с подтверждённой доступной квотой'
+    reason: agent ? `${agent}: selected using current quota (threshold ${threshold}%)` : 'No agent has confirmed quota available'
   }
 }

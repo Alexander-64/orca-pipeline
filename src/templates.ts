@@ -1,44 +1,44 @@
 export const SCENARIO_TEMPLATES: Record<string, string> = {
   'implement-review': `name: implement-review
-objective: Реализовать изменение и независимо проверить результат
+objective: Implement a change and have an independent reviewer verify it
 steps:
   - id: implement
-    title: Реализация
-    spec: Внести требуемое изменение и выполнить проверки
+    title: Implementation
+    spec: Make the requested change and run the checks
     agent: codex
     fallback: [opencode, kimi]
     reviewAgent: claude
     acceptance: [pnpm test]
 `,
   'bugfix-regression': `name: bugfix-regression
-objective: Исправить ошибку и закрепить её регрессионным тестом
+objective: Fix the bug and cover it with a regression test
 steps:
   - id: reproduce
-    title: Воспроизведение
-    spec: Добавить минимальный failing regression test
+    title: Reproduce the bug
+    spec: Add a minimal regression test that fails
     agent: codex
     acceptance: [pnpm test]
   - id: fix
-    title: Исправление
+    title: Fix the bug
     needs: [reproduce]
-    spec: Исправить причину ошибки, не меняя тест на более слабый
+    spec: Fix the cause of the bug and keep the regression test intact
     agent: codex
     fallback: [opencode, kimi]
     reviewAgent: claude
     acceptance: [pnpm test]
 `,
   'research-design': `name: research-design
-objective: Исследовать задачу, согласовать дизайн и реализовать его
+objective: Investigate the task, agree on a design and implement it
 steps:
   - id: research
-    title: Исследование
-    spec: Изучить код и сформулировать варианты решения с trade-offs
+    title: Investigate
+    spec: Review the code and describe the options and trade-offs
     agent: kimi
     acceptance: [git status]
   - id: implement
-    title: Реализация по дизайну
+    title: Implement the design
     needs: [research]
-    spec: Реализовать выбранный вариант и проверить результат
+    spec: Implement the chosen design and verify the result
     agent: codex
     fallback: [opencode, kimi]
     reviewAgent: claude

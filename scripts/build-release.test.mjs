@@ -56,7 +56,7 @@ test('release is complete, byte-identical, source-only and does not overwrite', 
     const result = await buildRelease(path.join(temp, 'release'))
     assert.ok(result.files.includes('vendor/yaml/LICENSE'))
     assert.equal(result.licenseIncluded, true)
-    for (const name of ['README.md', 'README.en.md', 'README.zh-CN.md', 'src/worker.ts', 'src/panel.tsx']) assert.ok(result.files.includes(name))
+    for (const name of ['README.md', 'README.ru.md', 'README.zh-CN.md', 'src/worker.ts', 'src/panel.tsx']) assert.ok(result.files.includes(name))
     const actual = await readdir(result.output, { recursive: true })
     const files = []
     for (const name of actual) {
@@ -78,7 +78,7 @@ test('release is complete, byte-identical, source-only and does not overwrite', 
 async function fixture(t) {
   const projectRoot = await mkdtemp(path.join(await realpath(tmpdir()), 'release-fixture-'))
   t.after(() => rm(projectRoot, { recursive: true, force: true }))
-  for (const name of ['src', 'vendor', 'orca-plugin.json', 'README.md', 'README.en.md', 'README.zh-CN.md', 'LICENSE']) {
+  for (const name of ['src', 'vendor', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
     await cp(path.join(root, name), path.join(projectRoot, name), { recursive: true })
   }
   return projectRoot

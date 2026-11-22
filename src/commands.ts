@@ -10,14 +10,14 @@ function allowedBy(command: string, prefix: string): boolean {
 
 export function validateCommand(command: string, policy: CommandPolicy = {}): void {
   const normalized = command.trim()
-  if (!normalized) throw new Error('acceptance: пустая команда')
-  if (DESTRUCTIVE.test(normalized)) throw new Error(`acceptance: destructive команда запрещена: ${normalized}`)
-  if (NETWORK.test(normalized)) throw new Error(`acceptance: сетевая команда требует отдельного разрешения: ${normalized}`)
+  if (!normalized) throw new Error('acceptance: empty command')
+  if (DESTRUCTIVE.test(normalized)) throw new Error(`acceptance: destructive command is prohibited: ${normalized}`)
+  if (NETWORK.test(normalized)) throw new Error(`acceptance: network command requires separate authorization: ${normalized}`)
   if (policy.readOnly && !READ_ONLY.some((prefix) => allowedBy(normalized, prefix))) {
-    throw new Error(`acceptance: команда не разрешена в read-only режиме: ${normalized}`)
+    throw new Error(`acceptance: command is not allowed in read-only mode: ${normalized}`)
   }
   if (policy.allowedCommands && !policy.allowedCommands.some((prefix) => allowedBy(normalized, prefix))) {
-    throw new Error(`acceptance: команда отсутствует в allowlist: ${normalized}`)
+    throw new Error(`acceptance: command is not on the allowlist: ${normalized}`)
   }
 }
 
