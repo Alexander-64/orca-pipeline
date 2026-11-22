@@ -18,7 +18,7 @@ Agent Pipeline lets you give a coding task to one agent in Orca and have another
 Install with the CLI included in Orca **1.4.248 or later**.
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
+orca plugin install Alexander-64/orca-pipeline@v0.1.3 --json
 ```
 
 Orca will show the permissions and a command containing `--approve <fingerprint>`. Review them before running that command. Agent Pipeline runs as a trusted Node.js worker under your account, with access to your files, the network and external programs. Through Orca it lists agents and workspaces, opens coordinator terminals and stores its settings and run history.

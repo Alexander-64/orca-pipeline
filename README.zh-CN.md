@@ -18,7 +18,7 @@ Agent Pipeline 是一个 Orca 插件，可以让多个智能体按依赖顺序�
 需要 Orca **1.4.248 或更高版本**，并确保终端能调用 `orca`。
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.2 --json
+orca plugin install Alexander-64/orca-pipeline@v0.1.3 --json
 ```
 
 安装时，Orca 会列出插件申请的权限。确认后，运行提示中带 `--approve <fingerprint>` 的命令。插件需要读取智能体和工作区、启动协调器终端、读取插件设置，以及保存计划、运行记录和日志。插件以 `trusted-worker` 模式运行，Node 进程拥有当前用户的文件、网络和程序执行权限。Orca 列出的权限只约束插件对 Orca API 的调用。
