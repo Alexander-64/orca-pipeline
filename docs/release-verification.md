@@ -50,6 +50,17 @@ The standalone tarball also passed a clean installation outside the source check
 
 ## Publication and follow-up
 
-The version tag carries the reviewed installation tree. The main branch carries the development sources and tests. Compare the fetched tag’s Orca content hash with the locally installed candidate, and publish the terminal tarball and plugin ZIP with checksums. Orca’s static validator limits host-call analysis to the first 64 files. The verification here covers macOS arm64.
+The [GitHub release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.2.1) contains the Orca plugin ZIP, the standalone terminal tarball and SHA-256 checksums. All three public downloads matched their local files. The [development source](https://github.com/Alexander-64/orca-pipeline/tree/e46439771f2663f9f7bd299a3f5117c4b917bb3e) and the [installable tag](https://github.com/Alexander-64/orca-pipeline/tree/v0.2.1) identify the two trees.
+
+| Final release check on macOS arm64 | Result |
+| --- | --- |
+| Public tag installation | Orca resolved `v0.2.1` to `62cc56a614e1b94abc1e34f6fb3cfe28395ed248`. |
+| Installation contents | 144 files. The release build, fresh public clone and installed plugin shared Orca content hash `ecaa7fadbfc952563982d55b5dabda0b5768081edf75e27d67308703ab07e56f`. |
+| Source tests | 251 passed on Orca 1.4.248 and 251 on 1.4.263, including all 10 packaging tests. The packaged panels rendered on both. |
+| Types | The source passed against both Orca APIs. The 1.4.248 macOS ZIP omits the authoring declarations, so that check used the matching upstream v1.4.248 declarations with its own generator. The terminal TypeScript project passed separately. |
+| Terminal and UI | 110 terminal tests, 24 headless journeys, editor language and keyboard checks, and a three-step installed CLI run passed. |
+| Historical result | After installing from the public tag in the upgrade profile, Results still showed the original v0.1.3 run and the recorded rejection. |
+
+Orca’s static validator inspects host calls in the first 64 loaded files. The `orca-plugin` topic is present. The Community directory updates from GitHub tags on its own schedule. [Directory publication rules](https://orca.dev/plugins/add/)
 
 For a first-user study, supply a project with one old completed run and one interrupted run. Ask the participant to find the older output, explain a blocked dependency and continue the interrupted run. Record completion, first correct action time, mistaken run selections, and whether completed work was duplicated. Ask a screen-reader user to create and remove a dependency with their usual setup. The desktop and accessibility checks above provide a baseline for this study.
