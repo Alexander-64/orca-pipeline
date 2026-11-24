@@ -30,7 +30,7 @@ test('adds an independent gate and routes downstream dependencies through it', (
 })
 
 test('rejects a reviewer who authored the implementation', () => {
-  assert.throws(() => parseScenario(gated.replace('reviewAgent: claude', 'reviewAgent: codex')), /must differ/)
+  assert.throws(() => parseScenario(gated.replace('reviewAgent: claude', 'reviewAgent: codex')), /должен отличаться/)
 })
 
 test('FIX-FIRST creates a bounded repair and re-review before SHIP', async () => {
@@ -83,5 +83,5 @@ test('maxRepairs zero turns the first FIX-FIRST into a terminal failure', async 
   h.statuses.set('task_build-evidence', 'failed')
   await h.coordinator.tick(run.id)
   assert.equal(run.status, 'failed')
-  assert.match(run.tasks['build-evidence'].error ?? '', /repair limit/)
+  assert.match(run.tasks['build-evidence'].error ?? '', /лимит исправлений/)
 })

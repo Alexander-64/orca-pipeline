@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { workspaceSelector, type OrcaClient } from './cli'
 import { parseScenario } from './scenario'
@@ -11,7 +12,7 @@ type Deps = {
 export function extractYaml(output: string): string {
   const blocks = [...output.matchAll(/```(?:yaml|yml)\s*\n([\s\S]*?)```/gi)]
   const source = blocks.at(-1)?.[1]?.trim()
-  if (!source) throw new Error('Planner returned no fenced YAML block')
+  if (!source) throw new Error('Planner не вернул fenced YAML-блок')
   parseScenario(source)
   return `${source}\n`
 }
@@ -44,7 +45,7 @@ export class Planner {
 
   get(id: string): PlannerRun {
     const plan = this.plans.get(id)
-    if (!plan) throw new Error(`Planner ${id} was not found`)
+    if (!plan) throw new Error(`Planner ${id} не найден`)
     return plan
   }
 
@@ -56,36 +57,40 @@ export class Planner {
     return [...this.plans.values()]
   }
 
-  async start(workspace: Workspace, coordinatorHandle: string, objective: string, agent: string): Promise<PlannerRun> {
-    if (!objective.trim()) throw new Error('Enter an objective for the planner')
-    const runId = await this.deps.client.createRun(`Plan a pipeline: ${objective}`, coordinatorHandle)
+  async start(workspace: Workspace, coordinatorHandle: string, objective: string, agent: string, options: { outputPath?: string; model?: string; effort?: string } = {}): Promise<PlannerRun> {
+    if (!objective.trim()) throw new Error('Опишите цель для planner')
+    const runId = await this.deps.client.createRun(`Составить pipeline: ${objective}`, coordinatorHandle)
     const step: ScenarioStep = {
       id: 'plan',
-      title: 'Generate a YAML scenario',
+      title: 'Составить YAML-сценарий',
       spec: objective,
       needs: [],
       agent,
+      model: options.model, effort: options.effort,
       fallback: [],
       placement: { host: 'local', worktree: 'current' },
-      acceptance: ['YAML passes schema validation'],
+      acceptance: ['YAML проходит проверку схемы'],
       maxAttempts: 1,
       maxRepairs: 0
     }
     const spec = [
-      'You are the planner for an agent pipeline. Keep the workspace read-only.',
-      `User objective: ${objective}`,
-      'Plan a DAG of small independent steps. For each step, give a self-contained spec, agent, fallback, placement and objective acceptance commands. Use local/current unless the user explicitly requests a remote host. Include an independent review for significant changes. Use only known remote host names, models and project commands.',
-      'In your final answer, return exactly one ```yaml fenced block with name, objective and steps. Each step contains id, title, spec, agent, fallback, placement and acceptance, plus needs, model, effort and maxAttempts when needed. End your answer with the YAML block.',
-      'Then send worker_done with the actual outcome.'
+      'Ты planner агентного pipeline. Исследуй README, структуру и доступные команды проекта. Не меняй исходники, не читай секреты и содержимое личных inbox. Никаких внешних сообщений.',
+      options.outputPath ? `Сохрани итоговый валидный YAML в файл ${JSON.stringify(options.outputPath)}. Это единственный файл, который разрешено изменить. Не записывай markdown-ограждения в файл. Перед worker_done проверь, что файл существует и содержит полный сценарий.` : '',
+      `Проект: ${workspace.name}; рабочий каталог: ${workspace.path}. Все шаги должны выполнять работу в этом каталоге.`,
+      `Цель пользователя: ${objective}`,
+      'Составь DAG из небольших независимых шагов. Для каждого шага укажи самодостаточный spec, agent, fallback, placement и объективные acceptance-команды. fallback обязан быть списком строк, например fallback: [claude]. placement обязан быть объектом с полями host и worktree, например placement: {host: local, worktree: current}; строка local/current недопустима. Используй local/current, если пользователь явно не указал remote. Добавь отдельный независимый review для важных изменений. Не выдумывай имена remote hosts, модели и команды проекта.',
+      'В финальном ответе верни ровно один блок ```yaml с полями name, objective и steps. Каждый step: id, title, spec, agent, fallback, placement, acceptance; при необходимости needs, model, effort, maxAttempts. Не добавляй пояснений после YAML.',
+      'Для ветвлений по данным используй version: 2. Производитель объявляет outputSchema: {decision: {type: string, enum: [improve, pass]}}, преемник — needs: [producer] и when: {step: producer, field: decision, op: eq, value: improve}. Типы string/number/boolean; операции eq/ne/gt/gte/lt/lte/exists; группы all/any. Финальное объединение альтернатив — join: all_settled. Без него нужны успешные результаты всех needs. Поля условий должны быть объявлены у предшественников. В spec производителя потребуй финальный JSON {pipelineResult: {version: 1, data: {...}}, report: ...}; пропущенные ветки не создают исполнителя. Approval — отдельное решение пользователя.',
+      'В body сообщения worker_done включи ПОЛНЫЙ YAML-блок, а не только краткое резюме. Сообщи реальный outcome. YAML-файл должен быть записан до worker_done.'
     ].join('\n\n')
     const taskId = await this.deps.client.createTask(runId, coordinatorHandle, step, spec, [])
     const dispatchId = await this.deps.client.startWorker(
-      { runId, coordinatorHandle, workspacePath: workspace.path, workspaceSelector: workspaceSelector(workspace) },
+      { runId, coordinatorHandle, workspacePath: workspace.path, workspaceSelector: workspaceSelector(workspace), ...(options.outputPath ? { visibleWorkers: true, focusWorker: true } : {}) },
       step,
       taskId,
       agent
     )
-    const plan: PlannerRun = { id: randomUUID(), runId, dispatchId, agent, workspaceId: workspace.id, objective, createdAt: new Date().toISOString(), status: 'running' }
+    const plan: PlannerRun = { id: randomUUID(), runId, dispatchId, agent, workspaceId: workspace.id, objective, createdAt: new Date().toISOString(), status: 'running', ...options, ...(options.outputPath ? { visibleWorkers: true } : {}) }
     this.plans.set(plan.id, plan)
     this.deps.notify(plan)
     void this.tick(plan.id)
@@ -101,14 +106,18 @@ export class Planner {
       const tasks = await this.deps.client.listTasks(plan.runId)
       const status = String(tasks[0]?.status ?? '').toLowerCase()
       if (['completed', 'succeeded', 'success', 'done'].includes(status)) {
-        plan.source = extractTaskYaml(tasks[0]?.result)
+        let fileSource: string | undefined
+        if (plan.outputPath) {
+          try { const source = await readFile(plan.outputPath, 'utf8'); parseScenario(source); fileSource = source } catch { /* Fall back to durable Task result. */ }
+        }
+        plan.source = fileSource ?? extractTaskYaml(tasks[0]?.result)
           ?? extractYaml(await this.deps.client.workerOutput(plan.dispatchId))
         plan.status = 'done'
-        await this.deps.client.releaseWorker(plan.dispatchId).catch(() => undefined)
+        if (!plan.visibleWorkers) await this.deps.client.releaseWorker(plan.dispatchId).catch(() => undefined)
         this.deps.notify(plan)
       } else if (['failed', 'stopped', 'cancelled', 'canceled'].includes(status)) {
         plan.status = 'failed'
-        plan.error = await this.deps.client.workerOutput(plan.dispatchId).catch(() => 'The planner failed')
+        plan.error = await this.deps.client.workerOutput(plan.dispatchId).catch(() => 'Planner завершился с ошибкой')
         this.deps.notify(plan)
       }
     } catch (error) {

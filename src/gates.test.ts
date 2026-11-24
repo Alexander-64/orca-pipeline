@@ -32,7 +32,7 @@ test('rejected gate fails the step without a worker', async () => {
   await h.coordinator.resolveGate(run.id, 'deploy', 'reject')
   assert.equal(run.status, 'failed')
   assert.equal(h.starts.length, 0)
-  assert.match(run.tasks.deploy.error ?? '', /rejected/)
+  assert.match(run.tasks.deploy.error ?? '', /отклонил/)
 })
 
 test('approval field survives repeated task polling', async () => {

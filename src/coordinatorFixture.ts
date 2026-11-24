@@ -15,13 +15,14 @@ export const fixtureWorkspace: Workspace = {
   hostId: null
 }
 
-export function coordinatorFixture(options: { startError?: string; stopError?: string; handoffError?: string; usage?: UsageReader; artifacts?: ArtifactStore; pr?: PrClient } = {}) {
+export function coordinatorFixture(options: { startError?: string; startErrorDetails?: unknown; launchedTerminal?: string; stopError?: string; handoffError?: string; usage?: UsageReader; artifacts?: ArtifactStore; pr?: PrClient } = {}) {
   const statuses = new Map<string, string>()
   const gates = new Map<string, { id: string; status: string; resolution?: string }>()
   const dependenciesByTask = new Map<string, string[]>()
   const dispatchTasks = new Map<string, string>()
-  const starts: { taskId: string; agent: string; retryOf?: string }[] = []
+  const starts: { taskId: string; agent: string; retryOf?: string; reuseTerminal?: string }[] = []
   const stops: string[] = []
+  const releases: string[] = []
   const handoffs: string[] = []
   const beadOrder: string[] = []
   const saved: PipelineRun[] = []
@@ -59,9 +60,9 @@ export function coordinatorFixture(options: { startError?: string; stopError?: s
       }
       return [...statuses].map(([id, status]) => ({ id, status }))
     },
-    startWorker: async (_run: unknown, _step: unknown, taskId: string, agent: string, retryOf?: string) => {
-      if (options.startError) throw new Error(options.startError)
-      starts.push({ taskId, agent, retryOf })
+    startWorker: async (_run: unknown, _step: unknown, taskId: string, agent: string, retryOf?: string, reuseTerminal?: string) => {
+      if (options.startError) throw Object.assign(new Error(options.startError), { details: options.startErrorDetails, launchedTerminal: options.launchedTerminal })
+      starts.push({ taskId, agent, retryOf, ...(reuseTerminal ? { reuseTerminal } : {}) })
       sequence += 1
       const dispatchId = `dispatch_${sequence}`
       dispatchTasks.set(dispatchId, taskId)
@@ -74,7 +75,7 @@ export function coordinatorFixture(options: { startError?: string; stopError?: s
     },
     workerOutput: async () => state.output,
     workerActivityDone: async () => state.activityDone,
-    releaseWorker: async () => undefined,
+    releaseWorker: async (id: string) => { releases.push(id) },
     stopWorker: async (dispatchId: string) => {
       if (options.stopError) throw new Error(options.stopError)
       stops.push(dispatchId)
@@ -101,5 +102,5 @@ export function coordinatorFixture(options: { startError?: string; stopError?: s
     notify: () => undefined,
     log: () => undefined
   })
-  return { coordinator, client, statuses, starts, stops, handoffs, beadOrder, saved, state, gates }
+  return { coordinator, client, statuses, starts, stops, releases, handoffs, beadOrder, saved, state, gates }
 }

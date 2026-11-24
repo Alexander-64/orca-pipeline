@@ -9,11 +9,11 @@ export const demoRun: PipelineRun = {
   workspacePath: '/tmp/demo',
   scenario: {
     name: 'demo-pipeline',
-    objective: 'Verify the pipeline',
+    objective: 'Проверить pipeline',
     steps: [{
       id: 'build',
-      title: 'Implementation',
-      spec: 'Make the change and run the checks',
+      title: 'Реализация',
+      spec: 'Внести изменение и запустить проверки',
       needs: [],
       agent: 'codex',
       fallback: ['claude'],
@@ -36,7 +36,7 @@ export const demoRun: PipelineRun = {
         agent: 'codex',
         status: 'running',
         startedAt: '2026-11-10T12:00:00.000Z',
-        output: 'Running checks…'
+        output: 'Выполняются проверки…'
       }]
     }
   },
@@ -46,7 +46,7 @@ export const demoRun: PipelineRun = {
 
 export const demoDashboard: Dashboard = {
   runs: [],
-  beads: [{ id: 'bd-demo1', title: 'Implementation', status: 'in_progress', priority: 2, issueType: 'task' }],
+  beads: [{ id: 'bd-demo1', title: 'Реализация', status: 'in_progress', priority: 2, issueType: 'task' }],
   workspaces: [{ id: 'workspace-1', kind: 'worktree', name: 'Demo', path: '/tmp/demo', branch: 'main', hostId: null }],
   metrics: metricsForRuns([])
 }
@@ -79,3 +79,21 @@ steps:
       worktree: 'id:workspace-demo'
     acceptance: [npm test]
 `
+
+// Deliberately shuffled: the monitor must follow dependencies, not source order.
+export const dependencyRun: PipelineRun = (() => {
+  const run = structuredClone(demoRun)
+  const base = run.scenario.steps[0]
+  run.scenario.steps = [
+    { ...base, id: 'join', title: 'Собрать результаты исследования и проверки контракта', needs: ['research', 'contract'] },
+    { ...base, id: 'research', title: 'Исследовать процесс, маршруты и роли SDD', needs: [] },
+    { ...base, id: 'contract', title: 'Проверить машинный контракт и требования к результату', needs: [] },
+    { ...base, id: 'independent', title: 'Независимая ветка', needs: [] },
+    { ...base, id: 'review', title: 'Финальная проверка', needs: ['join'], join: 'all_settled' }
+  ]
+  run.tasks = Object.fromEntries(run.scenario.steps.map(step => [step.id, {
+    stepId: step.id, taskId: `task_${step.id}`, agent: step.agent,
+    status: step.id === 'research' ? 'done' : step.id === 'contract' ? 'failed' : step.id === 'independent' ? 'running' : 'blocked', attempts: []
+  }]))
+  return run
+})()

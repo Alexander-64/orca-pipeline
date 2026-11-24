@@ -6,19 +6,21 @@ Agent Pipeline 是一个 Orca 插件，可以让多个智能体按依赖顺序�
 
 ![Agent Pipeline 的图形编辑器与 YAML 草稿](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/scenario-editor.png)
 
+**0.2.1 新功能** · 通过 **Browse all runs** 跨项目查找历史记录，在 **Results** 查看失败命令、退出码和输出。中断后可选择 **Diagnose and continue**。界面支持英语和俄语。 [发布说明](docs/release-0.2.1.md)
+
 ## 可以用它做什么
 
 - **把目标写成计划。** 在 Planner 中描述目标，让选定的智能体起草 YAML。你可以在图上调整步骤、预览哪些任务可以并行，再把场景存进仓库供团队复用。
 - **分配任务。** 为每一步指定智能体、主机和 Git 工作树。例如，调研和设计可以同时进行，实现步骤等两者完成后再开始。并发数可以按整个运行、模型提供商或主机分别限制。
 - **决定何时放行。** 让另一位智能体审查改动并重复验收检查，或让指定步骤等待人工批准。发布场景还可以创建 GitHub 拉取请求，等待检查完成，再请求批准合并。
-- **查看执行记录。** 在 **Runs** 中查看每一步的尝试记录、最近一次输出和验收命令。在 **Metrics** 中比较不同智能体的尝试次数。如果项目使用 Beads，还可以在 **Beads** 中认领、关闭或重新打开关联任务。
+- **查看执行记录。** 在 运行监视器 中查看每一步的尝试记录、最近一次输出和验收命令。在 **Metrics** 中比较不同智能体的尝试次数。如果项目使用 Beads，还可以在 **Tasks** 中认领、关闭或重新打开关联任务。
 
 ## 安装
 
-需要 Orca **1.4.248 或更高版本**，并确保终端能调用 `orca`。
+以下安装命令适用于 Orca 1.4.263。在最低支持版本 1.4.248 上，可从发布页下载并解压插件 ZIP，然后运行 `orca plugin dev load ./agent-pipeline`。
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.3 --json
+orca plugin install Alexander-64/orca-pipeline@v0.2.1 --json
 ```
 
 安装时，Orca 会列出插件申请的权限。确认后，运行提示中带 `--approve <fingerprint>` 的命令。插件需要读取智能体和工作区、启动协调器终端、读取插件设置，以及保存计划、运行记录和日志。插件以 `trusted-worker` 模式运行，Node 进程拥有当前用户的文件、网络和程序执行权限。Orca 列出的权限只约束插件对 Orca API 的调用。
@@ -27,12 +29,12 @@ orca plugin install Alexander-64/orca-pipeline@v0.1.3 --json
 
 ## 跑一次工作流
 
-1. 打开 **Agent Pipeline → Scenario**，选中要修改的 **Workspace**。
+1. 打开 **Agent Pipeline → New run → Project**，选中要修改的 **Project**。
 2. 在 **Template** 中选 **Implementation → Evidence Gate**。用图形编辑器或 YAML 写清楚要改什么、怎么验收，将执行者设为 Codex，独立审核者设为 Claude。将示例里的验收命令换成项目实际使用的命令。
 3. 点击 **Validate YAML**，打开 **Run preview** 核对步骤顺序、智能体、主机、工作树和验收命令。
-4. 点击 **Start**，在 **Runs** 中查看进度、验收结果和每次尝试。已启用 Beads 时，可以在 **Beads** 中跟踪任务。
+4. 点击 **Start run**，在 运行监视器 中查看进度、验收结果和每次尝试。已启用 Beads 时，可以在 **Tasks** 中跟踪任务。
 
-要把场景和代码一起纳入版本管理，请在 **Scenario** 中选择协调器所在主机上的工作区，展开 **Repository scenarios**，填写文件名并点击 **Save file**。文件会保存到该仓库的 `pipelines/` 目录。要修改已有场景，先通过 **Browse pipelines/ → Open file** 打开它。
+要把场景和代码一起纳入版本管理，请在 **Project** 中选择协调器所在主机上的工作区，展开 **Repository scenarios**，填写文件名并点击 **Save file**。文件会保存到该仓库的 `pipelines/` 目录。要修改已有场景，先通过 **Browse pipelines/ → Open file** 打开它。
 
 ## 配额用尽时如何续跑
 
@@ -50,7 +52,7 @@ Community 从公开 GitHub 仓库读取根目录下的 v2 `orca-plugin.json` 和
 
 ## 架构与组件
 
-编辑中的草稿保存在 Orca 面板里。点击 **Start** 时，面板把 YAML 和工作区 ID 发给插件的 Node.js 工作进程。工作进程验证场景，打开协调器终端，再把启动时的场景交给协调器。之后对草稿的修改会在下次运行时生效。
+编辑中的草稿保存在 Orca 面板里。点击 **Start run** 时，面板把 YAML 和工作区 ID 发给插件的 Node.js 工作进程。工作进程验证场景，打开协调器终端，再把启动时的场景交给协调器。之后对草稿的修改会在下次运行时生效。
 
 ```mermaid
 flowchart TD
@@ -71,7 +73,7 @@ flowchart TD
 
 ## 本地开发
 
-使用 Node.js 22+ 和 Orca 1.4.248+，在仓库根目录运行：
+使用 Node.js 22.19+ 和 Orca 1.4.248+，在仓库根目录运行：
 
 ```sh
 npm ci

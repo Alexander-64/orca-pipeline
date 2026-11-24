@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "agent-pipeline",
   "name": "Agent Pipeline",
-  "version": "0.1.3",
+  "version": "0.2.1",
   "description": "Plan coding tasks in YAML or on a visual map, run them across agents, and send changes to a second agent for review. If an agent hits its quota, a fallback can pick up the work.",
   "engines": {
     "orca": ">=1.4.248"
@@ -22,6 +22,28 @@
     ],
     "settings": [
       {
+        "key": "interfaceLanguage",
+        "title": "Interface language / Язык интерфейса",
+        "description": "Language of Agent Pipeline panels and graph editors.",
+        "type": "string",
+        "default": "en",
+        "enum": [
+          "en",
+          "ru"
+        ],
+        "enumLabels": [
+          "English",
+          "Русский"
+        ]
+      },
+      {
+        "key": "beadsEnabled",
+        "title": "External Beads tracker",
+        "description": "Sync issues with Beads in the selected project. Requires a configured bd executable. Pipeline runs and their built-in task list work independently.",
+        "type": "boolean",
+        "default": false
+      },
+      {
         "key": "beadsExecutable",
         "title": "Beads CLI executable",
         "description": "Path or command name of bd on the coordinator host.",
@@ -37,6 +59,17 @@
         "default": 2500,
         "minimum": 500,
         "maximum": 60000
+      }
+    ],
+    "customEditors": [
+      {
+        "id": "pipeline-graph",
+        "title": "Pipeline graph and YAML",
+        "extensions": [
+          ".pipeline.yaml"
+        ],
+        "entry": "src/graph-editor.ts",
+        "frame": "isolated"
       }
     ]
   },
@@ -55,9 +88,19 @@
     },
     {
       "kind": "terminal:send"
+    },
+    {
+      "kind": "workspace:write"
     }
   ],
+  "publisher": "alexander-64",
+  "license": "MIT",
   "screenshots": [
+    {
+      "path": "assets/run-results.png",
+      "alt": "Results for a sample documentation review, with a failed link check, exit code and the missing file path.",
+      "caption": "See the failed command and the recorded output in the same run."
+    },
     {
       "path": "assets/pipeline-planner.png",
       "alt": "Agent Pipeline in Orca with the visual DAG and YAML editor side by side.",
@@ -68,6 +111,5 @@
       "alt": "Completed simulated run in Orca showing a failed Codex quota attempt, a completed Claude retry and a completed Kimi Evidence Gate.",
       "caption": "Simulated quota failover followed by independent review."
     }
-  ],
-  "license": "MIT"
+  ]
 }

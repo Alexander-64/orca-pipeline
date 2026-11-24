@@ -45,12 +45,12 @@ test('allows a step to override its role policy', () => {
 })
 
 test('rejects an unknown role', () => {
-  assert.throws(() => parseScenario(source.replace('role: implementation', 'role: missing')), /unknown role/)
+  assert.throws(() => parseScenario(source.replace('role: implementation', 'role: missing')), /неизвестная роль/)
 })
 
 test('rejects inherited effort without an inherited model', () => {
   const withoutModel = source.replace('    model: gpt-default\n', '')
-  assert.throws(() => parseScenario(withoutModel), /effort requires model/)
+  assert.throws(() => parseScenario(withoutModel), /effort требует model/)
 })
 
 test('coordinator keeps the role reason on the attempt', async () => {

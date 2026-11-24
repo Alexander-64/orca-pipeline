@@ -11,7 +11,7 @@ test('allows ordinary test and inspection commands', () => {
 test('rejects destructive and network commands by default', () => {
   assert.throws(() => validateCommand('rm -rf dist'), /destructive/)
   assert.throws(() => validateCommand('git push origin main'), /destructive/)
-  assert.throws(() => validateCommand('curl https://example.com'), /network/)
+  assert.throws(() => validateCommand('curl https://example.com'), /сетевая/)
 })
 
 test('enforces an explicit allowlist', () => {

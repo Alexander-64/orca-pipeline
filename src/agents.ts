@@ -17,7 +17,7 @@ export async function discoverAgents(host: () => Promise<unknown>, accounts: () 
     const row = record(value)
     const id = typeof row.agent === 'string' ? row.agent.trim() : ''
     if (!id || !/^[\w.-]+$/.test(id)) return
-    merged.set(id, { id, label: typeof row.title === 'string' && row.title.trim() ? row.title : id, source, ...(typeof row.state === 'string' ? { status: row.state } : {}) })
+    merged.set(id, { id, label: id, source, ...(typeof row.state === 'string' ? { status: row.state } : {}) })
   }
   if (results[1].status === 'fulfilled') {
     for (const [id, value] of Object.entries(record(results[1].value))) {

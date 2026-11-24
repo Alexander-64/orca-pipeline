@@ -27,7 +27,7 @@ test('insert and duplicate allocate unique IDs after deletion', () => {
   const graph = deleteStep(insertStep(base()), 'review')
   const next = insertStep(graph, undefined, 'implement')
   assert.equal(next.steps.at(-1)?.id, 'step-4')
-  assert.equal(next.steps.at(-1)?.title, 'Implementation (copy)')
+  assert.equal(next.steps.at(-1)?.title, 'Реализация (копия)')
   assert.equal(new Set(next.steps.map(step => step.id)).size, next.steps.length)
 })
 
@@ -39,4 +39,15 @@ test('invalid edges, gates and commands are rejected without mutating the graph'
   assert.throws(() => patchStep(graph, 'implement', { reviewAgent: graph.steps[0].agent }))
   assert.throws(() => patchStep(graph, 'implement', { acceptance: [] }))
   assert.deepEqual(graph.steps[0].needs, [])
+})
+
+test('drawn connections reject cycles and survive YAML round trips; disconnect preserves independent steps', async () => {
+  const { connectSteps, disconnectSteps } = await import('./editor')
+  const graph = parseScenario(DEFAULT_SCENARIO, { expandEvidence: false })
+  assert.throws(() => connectSteps(graph, 'review', 'implement'), /цикл/)
+  const detached = disconnectSteps(graph, 'implement', 'review')
+  assert.deepEqual(detached.steps[1].needs, [])
+  const connected = connectSteps(detached, 'implement', 'review')
+  assert.deepEqual(connected.steps[1].needs, ['implement'])
+  assert.deepEqual(connectSteps(connected, 'implement', 'review').steps[1].needs, ['implement'])
 })

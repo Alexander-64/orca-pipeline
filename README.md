@@ -1,135 +1,75 @@
 # Agent Pipeline
 
-[English](README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md)
+**English** · [Русский](README.ru.md) · [简体中文](README.zh-CN.md)
 
-Agent Pipeline lets you give a coding task to one agent in Orca and have another check the result. For example, Codex can fix a CSV export bug and run the tests. Claude then reads the diff, reruns the checks and reports what it found. You can watch both steps in the same panel and save the workflow as YAML for the next bug.
+Plan a multi-agent task in Orca, see which steps can run together, and follow each agent through to its result. You can start with a template, ask a planner to draft a workflow, or open an existing `.pipeline.yaml` file.
 
-![The editor shows Research and Design running in parallel, with their YAML alongside](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/scenario-editor.png)
+**New in 0.2.1** · Find a run across projects, open the attempt behind a failed check, or resume an interrupted workflow. A standalone terminal client can run the same YAML and keep working after you detach. [Read the release notes](docs/release-0.2.1.md)
 
-## What you can do
+![Agent Pipeline showing a recorded check in the Results view](assets/run-results.png)
 
-- **Plan a change.** Give Planner a goal and an agent will draft a YAML scenario. Edit the steps on the map, preview which ones can run together, and save the scenario in the repository for your team.
-- **Split work across agents.** Choose a host and Git worktree for each step. Research and design can run in parallel, while implementation waits for both. Limit how many agents run at once, overall or by provider and host.
-- **Decide what can move forward.** Give a second agent the diff and acceptance checks, or ask a person to approve a step. A release scenario can also open a GitHub pull request, wait for its checks and request approval to merge.
-- **Find out what happened.** Open **Runs** for a step’s attempt history, latest output and acceptance commands. Use **Metrics** to compare attempts by agent, or **Beads** to claim, close and reopen linked issues if your project uses Beads.
+## First run
+
+1. Open **Agent Pipeline** and choose **New run**. Select a project and describe the task and its acceptance checks.
+2. To reuse a team workflow, expand **Repository scenarios** in **Project**, browse `pipelines/` and open a YAML file. **Save file** writes the edited draft back to the same project. [Example release workflow](pipelines/release.yaml)
+3. In **Steps and agents**, read the graph from top to bottom. Independent steps can start together. Select a step to edit its dependencies, primary agent, fallback order and optional reviewer. Model and effort choices come from the available Orca catalog.
+4. In **Launch**, expand **Run preview** to inspect agent order, review steps and acceptance commands. Check the working folder. A separate Git workspace starts from the current commit. To include uncommitted changes, select the original working folder. Choose **Start run**.
+5. Follow progress in the monitor. Select a step to open its agent session, answer a question or inspect a failed check. **View result** opens the final output. Partial results are available while a run is in progress.
+
+Use the run selector at the top to return to another project’s history. Saved runs keep their original parameters. **New run** opens an editable draft. If a launch is unconfirmed, **Diagnose and continue** checks the launch journal and existing agent sessions.
+
+The interface starts in English. Choose **Русский** in **English / Русский** at the top of the panel. Orca saves the preference for the panel and graph editor. Your YAML, step titles, agent replies and command output keep their original text.
 
 ## Install
 
-Install with the CLI included in Orca **1.4.248 or later**.
+On Orca 1.4.263, install the versioned plugin from GitHub:
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.1.3 --json
+orca plugin install Alexander-64/orca-pipeline@v0.2.1 --json
 ```
 
-Orca will show the permissions and a command containing `--approve <fingerprint>`. Review them before running that command. Agent Pipeline runs as a trusted Node.js worker under your account, with access to your files, the network and external programs. Through Orca it lists agents and workspaces, opens coordinator terminals and stores its settings and run history.
+Orca shows the publisher, version and requested access. Review the details, then use the approval command printed by Orca. On the minimum supported version, Orca 1.4.248, extract the plugin ZIP from the release and run `orca plugin dev load ./agent-pipeline`. [Download the release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.2.1)
 
-Sign in to the agent CLIs you plan to use on each execution host. For the Beads board, install `bd` on the machine running the coordinator and run `bd init` in your project. If Orca can’t find it, set the full path under **Settings → Plugins → Agent Pipeline → Beads CLI executable**.
+The trusted worker runs as your OS user, can open workspaces and terminals, and uses configured agent accounts. It reads the local model catalog to populate model choices. It stores run history and launch receipts in Orca plugin storage, and writes plan documents and attempt artifacts under `.agent-pipeline/` in the project. Review agent output and paths before sharing run data.
 
-## Try a change and a review
+The built-in **Tasks** tab works without external tools. To sync issues with Beads, configure `bd` in your project and enable **External Beads tracker** under **Settings → Plugins → Agent Pipeline**. Workflows that explicitly request pull request operations require an authenticated `gh` CLI.
 
-1. Open **Agent Pipeline → Scenario**, select your workspace and choose the **Implementation → Evidence Gate** template.
-2. Select the implementation step and give it a concrete task, such as “Fix CSV export so a comma inside a quoted field stays in that field.” Set the acceptance command to the test command your project actually uses. Choose the implementing agent and a different review agent, then click **Apply step**.
-3. Open **Run preview** to see who will do the work, in which worktree, and what each agent will check. Click **Start** when the plan looks right.
-4. In **Runs**, select a step to see its attempts and output. The reviewer can accept the change, request a fix and another review, or report a blocker.
-
-The map and YAML editor share one draft. To reuse it, open **Repository scenarios**, enter a name such as `csv-export.yaml`, and click **Save file**. The file goes in the selected workspace’s `pipelines/` directory on the coordinator host. To edit one that’s already in Git, choose **Browse pipelines/** and **Open file**. If the file changes on disk while you’re editing, reopen it before saving.
-
-## When an agent hits its limit
-
-If a step has fallback agents and Orca confirms that the current attempt ended on a quota limit, the coordinator can pass the work to the next eligible agent. The next agent receives a checkpoint with the previous attempt’s output and the checks it still needs to verify.
-
-![Attempt history in a simulated run: Codex stopped on quota and Claude completed the retry](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/attempt-history.png)
-
-In the simulated run above, Claude finishes the release notes after Codex hits its limit. Kimi then reviews the change. You can reproduce the handoff locally and read the checkpoint. [Run the failover demo](examples/failover/README.md)
-
-## For a larger workflow
-
-In YAML, `needs` sets the order of steps. Independent steps can run in parallel, subject to the limits you set for agents and hosts. Use `reviewAgent` to add an independent review, or `approval` to pause a step for a human decision. The release workflow in this repository shows how to test a Git commit, review it, and ask for approval before pushing its tag. [Read the release scenario](pipelines/release.yaml)
-
-<details>
-<summary>Example YAML</summary>
+## Workflow example
 
 ```yaml
-name: add-export
-objective: Add export and verify it with tests
+name: inspect-project
+objective: Review the project layout and verify the findings
 steps:
-  - id: implement
-    title: Implementation
-    spec: Implement the change in the current workspace
+  - id: inspect
+    title: Inspect the project
+    spec: Summarize the project layout and cite the files you read.
     agent: codex
-    fallback: [claude, kimi]
-    placement:
-      host: local
-      worktree: current
-    acceptance:
-      - npm test
+    acceptance: [git status]
   - id: review
-    title: Independent review
-    needs: [implement]
-    spec: Review the diff and rerun the tests
+    title: Verify the summary
+    needs: [inspect]
+    spec: Check the cited files and report inaccuracies.
     agent: claude
-    placement:
-      host: local
-      worktree: current
-    acceptance:
-      - npm test
+    acceptance: [git status]
 ```
 
-Replace the agent IDs and test commands with ones available in your project. For a remote step, set `placement.host` to a saved Orca environment. Use an exact worktree selector, or choose `new-child` or `new-top-level` and set `placement.repo`.
+## Architecture and development
 
-</details>
+The Orca panel and graph editor use a shared TypeScript DAG engine. The optional standalone terminal client uses the same engine with its own runtime and storage. The plugin can display terminal-owned runs and route commands back to their owning process. [Architecture and data flow](docs/architecture.md)
 
-## Architecture
-
-The Orca panel owns the draft you are editing. When you click **Start**, it sends the YAML and workspace ID to the plugin’s Node.js worker. The worker validates the scenario, opens a coordinator terminal and hands a snapshot to the coordinator. Later edits apply to the next run.
-
-```mermaid
-flowchart TD
-    UI["Orca panel"] <--> W["Plugin worker"]
-    W --> P["Planner"]
-    W --> C["Coordinator"]
-    W <--> S[("Plugin storage")]
-    P --> O["Orca CLI"]
-    C --> O
-    O --> A["Agents in local or remote worktrees"]
-    C --> R["Attempt reports"]
-    C -.-> X["Beads / GitHub PR"]
-```
-
-The **Planner** uses an Orca agent to produce a draft. The **Coordinator** creates tasks with dependencies, polls Orca for their status and dispatches ready work. Both use the same CLI client. The worker sends plan and run updates back to the panel. [Panel](src/panel.tsx) · [Worker](src/worker.ts) · [Planner](src/planner.ts) · [Coordinator](src/coordinator.ts) · [Orca client](src/cli.ts)
-
-Orca’s plugin storage keeps plans and run history across restarts. When an attempt ends, the coordinator writes a JSON report in the coordinator workspace under `.agent-pipeline/artifacts/<runId>/`, with the agent, its status, output and any reported file changes. Scenarios you save for reuse live separately in `pipelines/`. [Attempt reports](src/artifacts.ts) · [Scenario files](src/scenarioFiles.ts)
-
-<details>
-<summary>Development and release checks</summary>
-
-Use Node.js 22+ and the Orca CLI. Run these commands from a clean checkout.
+To develop the plugin or build the standalone client, use the main branch with Node.js 22.19 or later and the Orca CLI. [Development source](https://github.com/Alexander-64/orca-pipeline/tree/main)
 
 ```sh
 npm ci
 orca plugin types . --json
 npm run typecheck
 npm test
-npm run test:release
 npm run check
-npm run validate
+npm run test:release
+npm run build:release
+orca plugin validate dist/agent-pipeline --json
 ```
 
-Use watch mode to reload the panel as you edit it.
+For the standalone client, run `npm run build:terminal` and `node bin/pipeline.mjs --help`. Agent availability, login and remote execution depend on your environment.
 
-```sh
-orca plugin dev watch . --check --shot .orca/shots --json
-```
-
-To check the files that will ship, build into a fresh directory and validate it.
-
-```sh
-npm run build:release -- --out .release-smoke
-orca plugin validate .release-smoke --json
-```
-
-The default build replaces `dist/agent-pipeline`. Choose a fresh `--out` path if a running plugin uses that directory. The release includes the YAML runtime and its upstream license. For workflows that create pull requests, sign in to `gh` on the coordinator host. Live quota checks for Codex use `codex app-server`.
-
-</details>
-
-[Orca Community listing](https://orca.dev/plugins/alexander-64/orca-pipeline) · [MIT license](LICENSE)
+Maintained by [Alexander-64](https://github.com/Alexander-64). Distributed under the [MIT license](LICENSE). The vendored YAML parser retains its [upstream license](vendor/yaml/LICENSE).

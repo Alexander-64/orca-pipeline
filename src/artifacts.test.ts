@@ -1,5 +1,5 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { assert, test } from 'orca/testing'
 import { ArtifactStore } from './artifacts'
 import { coordinatorFixture, fixtureWorkspace } from './coordinatorFixture'
@@ -25,9 +25,18 @@ steps:
     assert.ok(attempt.artifactPath)
     assert.ok(attempt.artifactPath!.startsWith('.agent-pipeline/artifacts/'))
     const content = JSON.parse(await readFile(join(directory, attempt.artifactPath!), 'utf8'))
+    if (process.platform !== 'win32') assert.equal((await stat(join(directory, attempt.artifactPath!))).mode & 0o777, 0o600)
     assert.equal(content.version, 1)
     assert.equal(content.dispatchId, 'dispatch_1')
     assert.ok(!content.output.includes('very-secret'))
+    const store = new ArtifactStore(directory), path = join(directory, attempt.artifactPath!)
+    const previous = await readFile(path, 'utf8')
+    const unserializable = { ...attempt, data: { invalid: 1n } } as unknown as typeof attempt
+    await assert.rejects(store.save(run, run.tasks.build, unserializable))
+    assert.equal(await readFile(path, 'utf8'), previous)
+    await Promise.all(Array.from({length:8}, (_, index) => store.save(run, run.tasks.build, { ...attempt, output: 'revision-' + index })))
+    assert.ok(/^revision-[0-7]$/.test(JSON.parse(await readFile(path, 'utf8')).output))
+    assert.ok((await readdir(dirname(path))).every(name => !name.endsWith('.tmp')))
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

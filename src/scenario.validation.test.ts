@@ -13,11 +13,11 @@ steps:
 
 test('rejects duplicate step IDs', () => {
   const duplicate = `${valid}${valid.split('steps:\n')[1]}`
-  assert.throws(() => parseScenario(duplicate), /duplicate id/)
+  assert.throws(() => parseScenario(duplicate), /повторяющийся id/)
 })
 
 test('rejects an unknown dependency', () => {
-  assert.throws(() => parseScenario(valid.replace('    agent: codex', '    needs: [missing]\n    agent: codex')), /unknown dependency missing/)
+  assert.throws(() => parseScenario(valid.replace('    agent: codex', '    needs: [missing]\n    agent: codex')), /неизвестная зависимость missing/)
 })
 
 test('rejects attempts outside one to three', () => {

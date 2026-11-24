@@ -65,7 +65,7 @@ export class CodexUsageReader implements UsageReader {
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
-        params: { clientInfo: { name: 'agent-pipeline', version: '0.1.3' } }
+        params: { clientInfo: { name: 'agent-pipeline', version: '0.2.1' } }
       })}\n`)
     })
   }

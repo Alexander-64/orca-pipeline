@@ -31,5 +31,5 @@ test('selects each fallback once and carries the checkpoint', () => {
   attempts.push({ dispatchId: 'd2', agent: 'claude', status: 'failed', startedAt: 'later' })
   assert.equal(nextAgent(step, attempts), 'kimi')
   assert.match(handoffFor(step, attempts), /partial diff and usage limit/)
-  assert.match(handoffFor(step, attempts), /do not restart the task/i)
+  assert.match(handoffFor(step, attempts), /не начинай задачу заново/i)
 })

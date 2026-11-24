@@ -83,7 +83,7 @@ test('release contains the complete byte-identical inventory and does not overwr
 async function fixture(t) {
   const projectRoot = await mkdtemp(path.join(await realpath(tmpdir()), 'release-fixture-'))
   t.after(() => rm(projectRoot, { recursive: true, force: true }))
-  for (const name of ['src', 'vendor', 'assets', 'pipelines', 'examples', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
+  for (const name of ['packages/core', 'packages/runtime/store.ts', 'packages/runtime/process-lifetime.ts', 'docs', 'README.en.md', 'src', 'vendor', 'assets', 'pipelines', 'examples', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
     await cp(path.join(root, name), path.join(projectRoot, name), { recursive: true })
   }
   return projectRoot
@@ -104,6 +104,10 @@ test('release only accepts declared PNG screenshots inside the assets directory'
   const result = await buildRelease(undefined, { projectRoot })
   assert.equal(result.files.includes(unexpected), false)
   const image = path.join(projectRoot, screenshot.path)
+  const narrow = await readFile(image)
+  narrow.writeUInt32BE(820, 16)
+  await writeFile(image, narrow)
+  await assert.rejects(buildRelease(undefined, { projectRoot }), /at least 1280×800/)
   await writeFile(image, 'invalid PNG')
   await assert.rejects(buildRelease(undefined, { projectRoot }), /Invalid PNG screenshot/)
   await rm(image)
@@ -171,4 +175,18 @@ test('default output symlink and symlink parent cannot redirect replacement', as
   await symlink(outside, path.join(projectRoot, 'dist'))
   await assert.rejects(buildRelease(undefined, { projectRoot }), /symlink/)
   assert.deepEqual(await readdir(outside), [])
+})
+
+test('release requires its declared license and reachable language guides', async t => {
+  const projectRoot = await fixture(t)
+  const { output } = await buildRelease(undefined, { projectRoot })
+  const landing = await readFile(path.join(output, 'README.md'), 'utf8')
+  const russian = await readFile(path.join(output, 'README.ru.md'), 'utf8')
+  assert.match(landing, /\[Русский\]\(README\.ru\.md\)/)
+  assert.match(russian, /\[English\]\(README\.md\)/)
+  for (const match of landing.matchAll(/\]\(([^)#]+)\)/g)) {
+    if (!match[1].includes('://')) assert.ok((await lstat(path.join(output, match[1]))).isFile(), match[1])
+  }
+  await rm(path.join(projectRoot, 'LICENSE'))
+  await assert.rejects(buildRelease(undefined, { projectRoot }), /LICENSE/)
 })

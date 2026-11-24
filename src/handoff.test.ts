@@ -80,3 +80,32 @@ steps:
   await h.coordinator.tick(run.id)
   assert.deepEqual(run.tasks.build.attempts[0].filesModified, ['src/evidence.ts'])
 })
+
+test('surfaces a native worker failure report without treating its text as a quota signal', async () => {
+  const h = coordinatorFixture()
+  const run = await h.coordinator.start(fixtureWorkspace, 'term_1', parseScenario(`name: failure
+objective: failure
+steps:
+  - id: build
+    title: Build
+    spec: Work
+    agent: codex
+    fallback: [claude]
+    acceptance: [git diff --check]
+`))
+  const body = 'git diff --check failed: trailing whitespace in Document.js (line 429)'
+  h.client.listTasks = async () => [{ id: run.tasks.build.taskId, status: 'failed', result: JSON.stringify({
+    provenance: 'worker_report', outcome: 'failed', subject: 'Whitespace check failed', body
+  }) }]
+  await h.coordinator.tick(run.id)
+  const task = run.tasks.build
+  assert.equal(task.status, 'failed')
+  assert.equal(task.error, 'Whitespace check failed')
+  assert.equal(task.attempts[0].output, body)
+  assert.equal(h.starts.length, 1)
+
+  task.error = 'Исполнитель завершился: unknown'
+  h.coordinator.restore([run], { autoResume: false })
+  assert.equal(task.error, body)
+  assert.equal(h.starts.length, 1)
+})

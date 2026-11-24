@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // Explicit production inventory: new runtime modules must be reviewed here.
-const modules = 'agents artifacts beads capacity cli commands coordinator editor failover metrics mutations planner pr protocol quota scenario scenarioFiles templates types usage worker'.split(' ')
-const required = ['orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'pipelines/release.yaml', 'examples/failover/README.md', ...modules.map(name => `src/${name}.ts`), 'src/panel.tsx']
+const modules = 'agents artifacts beads capacity cli commands coordinator editor failover metrics step-status diagnostics i18n model-catalog mutations planner pr projects protocol quota scenario scenarioFiles templates terminal-bridge types usage worker'.split(' ')
+const coreModules = 'agent-preferences types scenario editor commands capacity quota failover metrics artifacts mutations chunked-storage coordinator contracts terminal-ipc results review'.split(' ')
+const required = ['orca-plugin.json', 'pipelines/release.yaml', 'examples/failover/README.md', 'LICENSE', 'README.md', 'README.en.md', 'README.ru.md', 'README.zh-CN.md', 'docs/architecture.md', 'docs/release-0.2.1.md', 'docs/release-0.2.1.ru.md', 'docs/terminal-agent-implementation-plan.md', 'docs/ux/README.md', 'docs/ux/cases.md', 'docs/ux/validation.md', ...modules.map(name => `src/${name}.ts`), ...coreModules.map(name => `packages/core/${name}.ts`), 'packages/runtime/store.ts', 'packages/runtime/process-lifetime.ts', 'src/panel.tsx', 'src/history-view.tsx', 'src/result-view.tsx', 'src/graph-editor.ts']
+
 const pngSignature = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
 const pngEnd = Buffer.from('0000000049454e44ae426082', 'hex')
 
@@ -50,7 +52,7 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
   const root = path.resolve(projectRoot)
   const destination = path.resolve(root, out)
   const relative = path.relative(root, destination).split(path.sep)
-  if (relative.some(part => ['.agent-pipeline', '.orca', '.git', 'node_modules'].includes(part)) || ['src', 'vendor', 'scripts', 'assets', 'pipelines', 'examples'].includes(relative[0])) throw new Error('Output overlaps protected project data')
+  if (relative.some(part => ['.agent-pipeline', '.orca', '.git', 'node_modules'].includes(part)) || ['src', 'vendor', 'scripts', 'packages', 'docs', 'assets', 'pipelines', 'examples'].includes(relative[0])) throw new Error('Output overlaps protected project data')
   const replace = destination === path.join(root, 'dist', 'agent-pipeline')
   const previous = await exists(destination)
   if (previous && !replace) throw new Error(`Output already exists; choose a fresh --out path: ${destination}`)
@@ -60,7 +62,7 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
     if (stat?.isSymbolicLink()) throw new Error(`Output parent is a symlink: ${parent}`)
     if (parent === path.dirname(parent)) break
   }
-  for (const dir of ['src', 'pipelines', 'examples', 'examples/failover', 'vendor', 'vendor/yaml', 'vendor/yaml/dist']) await sourceDirectory(root, dir)
+  for (const dir of ['docs', 'docs/ux', 'packages', 'packages/core', 'packages/runtime', 'src', 'pipelines', 'examples', 'examples/failover', 'vendor', 'vendor/yaml', 'vendor/yaml/dist']) await sourceDirectory(root, dir)
   const manifestFile = path.join(root, 'orca-plugin.json')
   await regular(manifestFile)
   const manifestBytes = await readFile(manifestFile)
@@ -68,15 +70,15 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
   const screenshots = screenshotPaths(manifest)
   if (screenshots.size) await sourceDirectory(root, 'assets')
   const files = [...required, ...screenshots, ...await vendorFiles(path.join(root, 'vendor/yaml'))]
-  if (await exists(path.join(root, 'LICENSE'))) files.push('LICENSE')
   const contents = new Map()
   for (const file of files.sort()) {
     await regular(path.join(root, file))
     const bytes = file === 'orca-plugin.json' ? manifestBytes : await readFile(path.join(root, file))
     if (screenshots.has(file)) {
-      if (!bytes.subarray(0, pngSignature.length).equals(pngSignature) || !bytes.subarray(-pngEnd.length).equals(pngEnd)) {
+      if (bytes.length < 33 || !bytes.subarray(0, pngSignature.length).equals(pngSignature) || !bytes.subarray(-pngEnd.length).equals(pngEnd)) {
         throw new Error(`Invalid PNG screenshot: ${file}`)
       }
+      if (bytes.readUInt32BE(16) < 1280 || bytes.readUInt32BE(20) < 800) throw new Error(`Screenshot must be at least 1280×800: ${file}`)
       contents.set(file, bytes)
       continue
     }
@@ -90,7 +92,8 @@ export async function buildRelease(out = 'dist/agent-pipeline', { projectRoot = 
     }
     contents.set(file, bytes)
   }
-  if (manifest.manifestVersion !== 2 || !contents.has(manifest.main) || !manifest.contributes.panels.every(panel => contents.has(panel.entry))) throw new Error('Invalid manifest entry points')
+  const entries = [...manifest.contributes.panels, ...(manifest.contributes.customEditors ?? [])]
+  if (manifest.manifestVersion !== 2 || !contents.has(manifest.main) || !entries.every(panel => contents.has(panel.entry))) throw new Error('Invalid manifest entry points')
   await mkdir(path.dirname(destination), { recursive: true })
   // Own a unique sibling workspace; only this workspace and the explicit default
   // output may be removed. Keep the old output until staging is complete.

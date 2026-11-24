@@ -30,6 +30,16 @@ test('returns zero rates and duration without completed work', () => {
   assert.deepEqual(metrics.byAgent, [])
 })
 
+test('skipped branches are counted separately and do not lower success of executed work', () => {
+  const run = structuredClone(demoRun)
+  run.tasks.build.status = 'done'
+  run.scenario.steps.push({ ...run.scenario.steps[0], id: 'skipped', needs: ['build'] })
+  run.tasks.skipped = { stepId: 'skipped', taskId: 'skipped-task', status: 'skipped', agent: 'pi', attempts: [], skipReason: 'Condition evaluated to false' }
+  const metrics = metricsForRuns([run])
+  assert.equal(metrics.completedSteps, 1); assert.equal(metrics.skippedSteps, 1)
+  assert.equal(metrics.totalSteps, 2); assert.equal(metrics.successRate, 100)
+})
+
 test('uses the latest update for an active run duration', () => {
   const run = structuredClone(demoRun)
   run.updatedAt = '2026-11-10T12:10:00.000Z'
@@ -37,11 +47,11 @@ test('uses the latest update for an active run duration', () => {
 })
 
 test('renders agent metrics and run timeline', async () => {
-  const host = mockHost({
+  const host = mockHost({ settings: { interfaceLanguage: 'ru' },
     requests: { 'dashboard.get': () => ({ ...demoDashboard, runs: [demoRun], metrics: metricsForRuns([demoRun]) }) }
   })
   const view = await mount(panel, { host, persisted: { plugin: { 'pipeline.tab': 'metrics' } } })
-  assert.deepEqual(view.rowsOf({ label: 'By agent' }), ['codex'])
+  assert.deepEqual(view.rowsOf({ label: 'По агентам' }), ['codex'])
   assert.ok(view.find({ text: /demo-pipeline/ }))
   await view.unmount()
 })
