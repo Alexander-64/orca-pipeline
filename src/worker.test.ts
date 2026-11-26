@@ -203,3 +203,32 @@ test('repair reports an unresolved resource instead of silently dropping its rec
   assert.equal((host.data().storage['pipeline.recovery.v1'] as { status: string }).status, 'blocked')
   await worker.deactivate()
 })
+
+test('Results IPC stages only the reviewed patch from the saved isolated worktree', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const { createCopy } = await import('../packages/runtime/worktree-review')
+  const temp = await mkdtemp(join(tmpdir(), 'orca-review-ipc-')), source = join(temp, 'source'), copy = join(temp, 'copy')
+  await mkdir(source)
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: source, stdio: 'pipe', encoding: 'utf8' })
+  git('init', '-q')
+  await writeFile(join(source, 'example'), 'base\n')
+  git('add', 'example'); git('-c', 'user.name=test', '-c', 'user.email=test@example.org', 'commit', '-qm', 'base')
+  const reviewBase = createCopy(source, copy)
+  const run = { ...demoRun, workspacePath: copy, reviewBase, sourceWorkspaceId: 'source', status: 'done' }
+  const host = mockHost({ storage: { 'pipeline.runs.v1': [run] }, results: {
+    'workspace.list': { workspaces: [{ id: 'source', kind: 'worktree', name: 'source', path: source, branch: null, hostId: null }], truncated: false }
+  } })
+  const worker = await mountWorker(main, { host })
+  try {
+    await writeFile(join(copy, 'example'), 'candidate\n')
+    const preview = await worker.request('run.diff', { id: run.id })
+    assert.match(preview.patch, /\+candidate/)
+    assert.equal(await readFile(join(source, 'example'), 'utf8'), 'base\n')
+    await assert.rejects(() => worker.request('run.accept', { id: run.id, digest: 'stale' }), /Preview again/)
+    await worker.request('run.accept', { id: run.id, digest: preview.digest })
+    assert.equal(git('show', ':example'), 'candidate\n')
+  } finally { await worker.deactivate(); await rm(temp, { recursive: true, force: true }) }
+})

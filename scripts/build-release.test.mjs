@@ -83,7 +83,7 @@ test('release contains the complete byte-identical inventory and does not overwr
 async function fixture(t) {
   const projectRoot = await mkdtemp(path.join(await realpath(tmpdir()), 'release-fixture-'))
   t.after(() => rm(projectRoot, { recursive: true, force: true }))
-  for (const name of ['packages/core', 'packages/runtime/store.ts', 'packages/runtime/process-lifetime.ts', 'docs', 'README.en.md', 'src', 'vendor', 'assets', 'pipelines', 'examples', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
+  for (const name of ['packages/core', 'packages/runtime/store.ts', 'packages/runtime/process-lifetime.ts', 'packages/runtime/worktree-review.ts', 'docs', 'README.en.md', 'src', 'vendor', 'assets', 'pipelines', 'examples', 'orca-plugin.json', 'README.md', 'README.ru.md', 'README.zh-CN.md', 'LICENSE']) {
     await cp(path.join(root, name), path.join(projectRoot, name), { recursive: true })
   }
   return projectRoot

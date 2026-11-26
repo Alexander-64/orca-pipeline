@@ -19,6 +19,8 @@ declare module 'orca' {
     'plan.open': { input: { id: string }; output: { opened: true } }
     'plan.get': { input: { id: string }; output: { plan: PlannerRun } }
     'run.repair': { input: { id: string }; output: { dashboard: Dashboard; report: import('./types').RecoveryReport } }
+    'run.diff': { input: { id: string }; output: { patch: string; digest: string; source: string; files: string[] } }
+    'run.accept': { input: { id: string; digest: string }; output: { accepted: true } }
     'run.start': { input: { workspaceId: string; source: string; separateWorkspace?: boolean }; output: { run: PipelineRun } }
     'run.open': { input: { id: string; dispatchId?: string }; output: { opened: true } }
     'run.assign-agent': { input: { id: string; stepId: string; agent: string }; output: { run: PipelineRun } }

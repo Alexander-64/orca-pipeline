@@ -4,7 +4,7 @@
 
 Plan a multi-agent task in Orca, see which steps can run together, and follow each agent through to its result. You can start with a template, ask a planner to draft a workflow, or open an existing `.pipeline.yaml` file.
 
-**New in 0.3.0** · See the last observed activity on a running step, open its Orca session and identify the input that a waiting step needs. Results count skipped branches separately. [Release notes](docs/release-0.3.0.md)
+**New in 0.4.0** · Reuse a parameterized scenario across projects, rehearse branches before launching agents, inspect handoffs, compare two results and review changes from an isolated Git run. [Release notes](docs/release-0.4.0.md)
 
 ![Agent Pipeline showing a recorded check in the Results view](assets/run-results.png)
 
@@ -20,15 +20,33 @@ Use the run selector at the top to return to another project’s history. Saved 
 
 The interface starts in English. Choose **Русский** in **English / Русский** at the top of the panel. Orca saves the preference for the panel and graph editor. Your YAML, step titles, agent replies and command output keep their original text.
 
+## Reuse, rehearse and review
+
+In **Project → Reusable scenarios**, select the audit template and enter a focus, such as the installation section of the README. **Create draft from template** opens the three steps in the editor. To save your own template, put parameters such as `{{focus}}` in the objective, a step title or its instructions, give the scenario a unique name and choose **Save draft as template**. The library persists across projects. `{{project}}` uses the selected project's folder.
+
+In **Launch → Rehearse branches**, enter sample JSON outputs or mark a step as failed. The preview uses the execution engine’s condition and join rules and identifies manual approvals. The simulation assumes approvals are granted. During a real run, select a step and expand a handoff to see the previous report, the recorded reason, a checkpoint excerpt and both native sessions.
+
+In **Results → Compare two runs**, choose a baseline, then open the other run from history. Expand a step to inspect changed report lines, recorded checks, file lists and the original step definition from each run.
+
+For a Git project, launch into a separate worktree. After a successful run, **Results → Review worktree changes** previews the patch. Acceptance stages the reviewed files in the source project. The source must still be at the original commit and the affected paths must be clean. The standalone CLI supports the same flow for its local backend:
+
+```sh
+pipeline run -C ./repo -f plan.yaml --isolated ../candidate --watch
+pipeline diff -C ./repo --isolated ../candidate --run RUN_ID
+pipeline accept -C ./repo --isolated ../candidate --run RUN_ID --digest SHA256_FROM_DIFF
+```
+
+The copy starts at the source commit. Preview includes ordinary new, changed and deleted UTF-8 text files. Runtime directories, ignored new files and root `node_modules` are excluded. The review limit is 512 KiB. Git retains the copy for further inspection. You can inspect the staged result with `git diff --cached` before committing.
+
 ## Install
 
 On Orca 1.4.263, install the versioned plugin from GitHub:
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.3.0 --json
+orca plugin install Alexander-64/orca-pipeline@v0.4.0 --json
 ```
 
-Orca shows the publisher, version and requested access. Review the details, then use the approval command printed by Orca. On the minimum supported version, Orca 1.4.248, extract the plugin ZIP from the release and run `orca plugin dev load ./agent-pipeline`. [Download the release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.3.0)
+Orca shows the publisher, version and requested access. Review the details, then use the approval command printed by Orca. On the minimum supported version, Orca 1.4.248, extract the plugin ZIP from the release and run `orca plugin dev load ./agent-pipeline`. [Download the release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.4.0)
 
 The trusted worker runs as your OS user, can open workspaces and terminals, and uses configured agent accounts. It reads the local model catalog to populate model choices. It stores run history and launch receipts in Orca plugin storage, and writes plan documents and attempt artifacts under `.agent-pipeline/` in the project. Review agent output and paths before sharing run data.
 

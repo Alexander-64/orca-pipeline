@@ -1,6 +1,6 @@
 {
   "name": "orca-agent-pipeline",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -56,6 +56,9 @@
     "bin",
     "dist/terminal",
     "README.md",
+    "README.ru.md",
+    "docs/release-0.4.0.md",
+    "docs/release-0.4.0.ru.md",
     "LICENSE",
     "docs/terminal-agent-implementation-plan.md",
     "scripts/e2e-*.mjs"

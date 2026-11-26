@@ -6,7 +6,7 @@ Agent Pipeline 是一个 Orca 插件，可以让多个智能体按依赖顺序�
 
 ![Agent Pipeline 的图形编辑器与 YAML 草稿](https://raw.githubusercontent.com/Alexander-64/orca-pipeline/main/docs/images/scenario-editor.png)
 
-**0.3.0 新功能** · 可在运行步骤中查看最近一次活动并打开 Orca 会话。结果会单独统计跳过的分支。[发布说明](docs/release-0.3.0.md)
+**0.4.0 新功能** · 可跨项目复用带参数的模板，在启动前模拟条件分支，查看智能体交接记录，并在结果页比较两次运行。对于独立 Git 工作树，可先查看差异，再将确认的补丁暂存到源项目。[发布说明](docs/release-0.4.0.md)
 
 ## 可以用它做什么
 
@@ -20,7 +20,7 @@ Agent Pipeline 是一个 Orca 插件，可以让多个智能体按依赖顺序�
 以下安装命令适用于 Orca 1.4.263。在最低支持版本 1.4.248 上，可从发布页下载并解压插件 ZIP，然后运行 `orca plugin dev load ./agent-pipeline`。
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.3.0 --json
+orca plugin install Alexander-64/orca-pipeline@v0.4.0 --json
 ```
 
 安装时，Orca 会列出插件申请的权限。确认后，运行提示中带 `--approve <fingerprint>` 的命令。插件需要读取智能体和工作区、启动协调器终端、读取插件设置，以及保存计划、运行记录和日志。插件以 `trusted-worker` 模式运行，Node 进程拥有当前用户的文件、网络和程序执行权限。Orca 列出的权限只约束插件对 Orca API 的调用。

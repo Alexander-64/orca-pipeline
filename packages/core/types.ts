@@ -87,6 +87,7 @@ export type Attempt = {
   output?: string
   filesModified?: string[]
   checks?: { command: string; exitCode: number | null }[]
+  checkpointPreview?: string
   selectionReason?: string
   artifactPath?: string
   reportPath?: string
@@ -144,6 +145,7 @@ export type PipelineRun = {
   workspaceSelector?: string
   scenario: Scenario
   visibleWorkers?: boolean
+  reviewBase?: string
   sourceWorkspaceId?: string
   status: RunStatus
   tasks: Record<string, PipelineTask>

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { head, reviewChanges } from '../packages/runtime/worktree-review'
 import { projectOptions } from './projects'
 import type { OrcaWorkerApi } from 'orca/worker'
 import { ArtifactStore } from './artifacts'
@@ -235,14 +236,24 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (!sourceWorkspace) throw new Error('Выберите доступный workspace')
     if (separateWorkspace && workspaceRestrictionConflicts(scenario, sourceWorkspace.path).length) throw new Error(`В заданиях разрешена работа только в ${sourceWorkspace.path}. Выберите «Работать в указанной папке» или измените ограничения перед созданием отдельного workspace.`)
     const workspace = separateWorkspace ? await client.createPipelineWorkspace(sourceWorkspace, scenario.name) : sourceWorkspace
+    const reviewBase = separateWorkspace ? head(workspace.path) : undefined
     const { terminalId } = await orca.host.call('terminal.create', {
       workspaceId: workspace.id,
       title: `Pipeline: ${scenario.name}`
     })
-    const run = await coordinator.start(workspace, terminalId, scenario, { visibleWorkers: true, sourceWorkspaceId: sourceWorkspace.id })
+    const run = await coordinator.start(workspace, terminalId, scenario, { visibleWorkers: true, sourceWorkspaceId: sourceWorkspace.id, reviewBase })
     await orca.host.call('workspace.open', { workspaceId: workspace.id }).catch(error => orca.log(`Open workspace: ${message(error)}`))
     return json({ run })
   })
+  const changes = async (id: string, digest?: string) => {
+    await initialize()
+    const run = coordinator.get(id)
+    const source = (await workspaces()).find(item => item.id === run.sourceWorkspaceId)
+    if (!source || !run.reviewBase || source.id === run.workspaceId || run.status !== 'done') throw new Error('A completed isolated Git run is required')
+    return reviewChanges(source.path, run.workspacePath, run.reviewBase, digest)
+  }
+  orca.panels.handle('run.diff', ({ id }) => changes(id))
+  orca.panels.handle('run.accept', async ({ id, digest }) => { await changes(id, digest); return { accepted: true as const } })
   orca.panels.handle('run.open', async ({ id, dispatchId }) => {
     await initialize(true)
     const run = coordinator.list().find(run => run.id === id) ?? terminalBridge.get(id)

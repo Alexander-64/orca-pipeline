@@ -78,6 +78,7 @@ test('continues a failed quota attempt on the next agent and finishes', async ()
   assert.deepEqual(h.starts[1], { agent: 'claude', retryOf: 'dispatch_1' })
   assert.equal(h.handoffs.length, 1)
   assert.match(h.handoffs[0], /partial work saved/)
+  assert.equal(run.tasks.build.attempts[1].checkpointPreview, h.handoffs[0].slice(-4000))
 
   h.statuses.set('task_build', 'running')
   await h.coordinator.tick(run.id)

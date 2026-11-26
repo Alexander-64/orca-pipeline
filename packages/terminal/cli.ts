@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { bindIsolated, isolatedChanges, prepareIsolated } from './isolation'
+import { workspaceRestrictionConflicts } from '../core/scenario'
 import { parseArgs } from 'node:util'
 import { readFile, realpath, mkdir, open } from 'node:fs/promises'
 import { join, dirname, resolve } from 'node:path'
@@ -57,14 +59,15 @@ async function main(): Promise<void> {
     project: { type: 'string', short: 'C' }, file: { type: 'string', short: 'f' }, json: { type: 'boolean' },
     watch: { type: 'boolean' }, run: { type: 'string' }, step: { type: 'string' }, agent: { type: 'string' },
     'request-id': { type: 'string' }, reject: { type: 'boolean' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' }, backend: { type: 'string' },
-    text: { type: 'string' }, question: { type: 'string' }, 'message-id': { type: 'string' }
+    isolated: { type: 'string' }, digest: { type: 'string' }, text: { type: 'string' }, question: { type: 'string' }, 'message-id': { type: 'string' }
   } })
   const command = positionals[0] ?? (process.stdin.isTTY && process.stdout.isTTY ? 'ui' : 'help')
   if (values.version) { const { version } = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')); console.log(values.json ? JSON.stringify({ version }) : version); return }
-  const project = await realpath(values.project ?? process.cwd())
+  let project = await realpath(values.project ?? process.cwd())
+  const originalProject = project
   const output = (value: unknown) => console.log(values.json ? JSON.stringify(value) : typeof value === 'string' ? value : JSON.stringify(value, null, 2))
   if (values.help || command === 'help') {
-    output('Agent Pipeline\n\n  pipeline ui [-C project] [--backend local|orca]\n  pipeline projects [--backend orca]\n  pipeline agent "request" [-f plan.pipeline.yaml] [--run id]\n  pipeline plan "task" [-C project] [-f plan.pipeline.yaml]\n  pipeline validate -f plan.pipeline.yaml\n  pipeline run -f plan.pipeline.yaml [--watch] [--json]\n  pipeline status | attach [--run id] [--json]\n  pipeline pause|resume|stop|retry --run id\n  pipeline approve --run id --step id [--reject]\n  pipeline assign --run id --step id --agent executor\n  pipeline send --run id --step id --text message [--message-id id]\n  pipeline answer --run id --step id --question id --text answer\n  pipeline recover --run id --step id\n  pipeline reconcile --run id\n  pipeline doctor\n\nExisting agent credentials are used. YAML and state are saved under .agent-pipeline/.')
+    output('Agent Pipeline\n\n  pipeline ui [-C project] [--backend local|orca]\n  pipeline projects [--backend orca]\n  pipeline agent "request" [-f plan.pipeline.yaml] [--run id]\n  pipeline plan "task" [-C project] [-f plan.pipeline.yaml]\n  pipeline validate -f plan.pipeline.yaml\n  pipeline run -f plan.pipeline.yaml [--watch] [--json] [--isolated new-directory]\n  pipeline diff|accept -C source --isolated directory --run id [--digest reviewed-sha256]\n  pipeline status | attach [--run id] [--json]\n  pipeline pause|resume|stop|retry --run id\n  pipeline approve --run id --step id [--reject]\n  pipeline assign --run id --step id --agent executor\n  pipeline send --run id --step id --text message [--message-id id]\n  pipeline answer --run id --step id --question id --text answer\n  pipeline recover --run id --step id\n  pipeline reconcile --run id\n  pipeline doctor\n\nExisting agent credentials are used. YAML and state are saved under .agent-pipeline/.')
     return
   }
   if (command === 'serve') { await serve(project); return }
@@ -116,6 +119,17 @@ async function main(): Promise<void> {
     output({ file: result.file, name: result.scenario.name, steps: result.scenario.steps.length, sessionFile: result.sessionFile })
     return
   }
+  if (command === 'diff' || command === 'accept') {
+    if (!values.run || !values.isolated || (command === 'accept' && !values.digest)) throw new Error('Pass --run ID and --isolated PATH. Acceptance also requires the reviewed --digest.')
+    const copy = await realpath(resolve(project, values.isolated))
+    await ensureSupervisor(copy)
+    const { runs } = await request(copy, { id: randomUUID(), command: 'status', runId: values.run }) as Dashboard
+    const run = runs.find(item => item.id === values.run)
+    if (!run) throw new Error('Unknown run')
+    const result = await isolatedChanges(project, copy, run, command === 'accept' ? values.digest : undefined)
+    output(values.json ? result : command === 'accept' ? 'Changes staged in ' + result.source : result.patch + '\nDigest: ' + result.digest)
+    return
+  }
   let source: string | undefined
   if (command === 'validate' || command === 'run') {
     if (!values.file) throw new Error('Pass --file scenario.pipeline.yaml')
@@ -124,6 +138,12 @@ async function main(): Promise<void> {
     if (command === 'validate') { output({ valid: true, scope: 'schema-and-graph', name: scenario.name, steps: scenario.steps.length }); return }
     const memory = new RunStore(':memory:')
     try { await createBackend(memory, project, config).preflightScenario(scenario) } finally { memory.close() }
+    if (values.isolated) {
+      if (config.backend === 'orca' || workspaceRestrictionConflicts(scenario, project).length) throw new Error('Isolated console runs require a local scenario without an original-folder restriction')
+      values['request-id'] ??= randomUUID()
+      project = await prepareIsolated(project, resolve(project, values.isolated), source, values['request-id'], config)
+      if (!values.json) output('Worktree: ' + project)
+    }
   }
   await ensureSupervisor(project)
   if (command === 'send' || command === 'answer') {
@@ -144,6 +164,7 @@ async function main(): Promise<void> {
     const allowed = ['run', 'pause', 'resume', 'stop', 'retry', 'recover', 'reconcile', 'approve', 'assign', 'open']
     if (!allowed.includes(command)) throw new Error('Unknown command: ' + command)
     const result = await request(project, { id: values['request-id'] ?? randomUUID(), command, runId: values.run, stepId: values.step, agent: values.agent, source, backend: values.backend as 'local' | 'orca' | undefined, ...(command === 'approve' ? { resolution: values.reject ? 'reject' as const : 'approve' as const } : {}) }) as PipelineRun
+    if (command === 'run' && values.isolated) await bindIsolated(originalProject, project, result.id)
     output(values.json ? result : summary(result))
     if (!values.watch) return
     values.run = result.id

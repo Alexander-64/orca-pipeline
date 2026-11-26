@@ -146,7 +146,7 @@ export class Coordinator {
     }
   }
 
-  async start(workspace: Workspace, coordinatorHandle: string, scenario: Scenario, options: { visibleWorkers?: boolean; sourceWorkspaceId?: string } = {}): Promise<PipelineRun> {
+  async start(workspace: Workspace, coordinatorHandle: string, scenario: Scenario, options: { visibleWorkers?: boolean; sourceWorkspaceId?: string; reviewBase?: string } = {}): Promise<PipelineRun> {
     if (scenario.version === 2 && scenario.steps.some(step => step.placement.host !== 'local' || step.placement.worktree !== 'current')) throw new Error('Scenario v2 currently requires local/current placement for shared result artifacts')
     await this.deps.client.preflightScenario?.(scenario)
     const createdAt = now()
@@ -573,6 +573,9 @@ export class Coordinator {
     const retryOf = task.startup?.dispatchId ?? (previous?.taskId && previous.taskId !== task.taskId ? undefined : previous?.dispatchId)
     const dispatchId = await this.deps.client.startWorker(run, stepForAgent(step, agent), task.taskId, agent, retryOf, task.startup?.terminalHandle ?? task.pendingTerminalHandle)
     const attempt: Attempt = { dispatchId, taskId: task.taskId, agent, status: 'running', startedAt: now(), selectionReason }
+    if (previous && previous.agent !== agent && handoff) {
+      attempt.checkpointPreview = redactSecrets(handoff).slice(-4000)
+    }
     task.recoveryAgent = undefined
     task.startup = undefined
     task.pendingTerminalHandle = undefined

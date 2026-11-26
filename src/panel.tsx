@@ -37,6 +37,7 @@ import {
 import { diagnosticText, renderDiagnostic } from './diagnostics'
 import { languageOf, translate, type Language, type Message } from './i18n'
 import { countRunSteps, STATUS } from './step-status'
+import { Comparison, Rehearsal, TemplateLibrary, WorktreeReview, resetRehearsal } from './workflow-views'
 import { RunResult } from './result-view'
 import { HistoryBrowser } from './history-view'
 import { metricsForRuns } from './metrics'
@@ -116,6 +117,7 @@ function selectNode(id: string): void {
 }
 
 function syncDraft(source: string): void {
+  if (source !== read(draft)) resetRehearsal()
   set(draft, source)
   set(fileStatus, '')
   if (read(workspaceId)) update(projectDrafts, drafts => ({ ...drafts, [read(workspaceId)]: source }))
@@ -792,6 +794,7 @@ function ProjectView() {
           }}
         />
       </Grid>
+      <TemplateLibrary project={dashboard?.workspaces.find(item => item.id === read(workspaceId))?.path ?? ''} draft={read(draft)} apply={source => { syncDraft(source); set(openedFile, null); set(fileName, ''); set(stage, 'steps') }} t={t} />
       <RepositoryFiles />
       <Collapsible title={t("Plan with an agent")} defaultOpen>
         <Stack gap="sm">
@@ -869,6 +872,7 @@ function LaunchView() {
       { label: t("Agents"), value: scenario ? [...new Set(scenario.steps.flatMap(step => [step.agent, ...step.fallback]))].join(', ') : '—' }
     ]} />
     <RunPreview />
+    {read(runScenario) ? <Rehearsal plan={read(runScenario)!} t={t} /> : null}
     {supportsSeparateWorkspace(workspace) ? <Stack gap="xs">
     <Checkbox label={t("Use a separate Pipeline workspace in Orca")} checked={separate} onChange={value => set(separateWorkspace, value)} />
     <Text muted size="xs">{t("A separate workspace branches from the selected project's current commit. Uncommitted files stay in the original workspace. Turn this off to work directly in the selected folder.")}</Text>
@@ -1010,6 +1014,16 @@ function AttemptsView({ run }: { run: PipelineRun }) {
             })}
           >{t("Stop and switch agent")}</Button>
         ) : null}
+        {[...(task.history ?? []), task].map(revision => revision.attempts.map((next, index) => {
+          const previous = revision.attempts[index - 1]
+          if (!previous || previous.agent === next.agent) return null
+          return <Collapsible key={next.dispatchId} title={t("Handoff · {0} → {1}", previous.agent, next.agent)}>
+            <Text>{previous.failure?.message || previous.reason || next.selectionReason || t("No recorded reason")}</Text>
+            {previous.output ? <CodeView code={previous.output} wrap maxHeight="sm" /> : null}
+            {next.checkpointPreview ? <Stack><Text>{t("Prepared checkpoint (last 4000 characters)")}</Text><CodeView code={next.checkpointPreview} wrap maxHeight="sm" /></Stack> : <Text>{t("Checkpoint preview unavailable")}</Text>}
+            {nativeSession ? <Row wrap>{[previous, next].map((item, position) => <Button onPress={() => openRun(run, item.dispatchId)}>{t(position === 0 ? "Open previous session · {0}" : "Open next session · {0}", item.agent)}</Button>)}</Row> : null}
+          </Collapsible>
+        }))}
         <Collapsible title={t("Attempts: {0}", task.attempts.length)} defaultOpen={task.attempts.length > 1}>
           <List>
             {task.attempts.map((attempt, index) => (
@@ -1372,7 +1386,7 @@ export default function Panel() {
         <Tab value="scenario" label="Pipeline"><ScenarioView /></Tab>
         <Tab value="result" label={t("Results")}><RunResult run={resultRun} projectName={resultRun ? runProject(resultRun) : ''} language={read(language)}
           openAttempt={dispatch => resultRun && openRun(resultRun, dispatch)}
-          openStep={id => { set(stepId, id); set(stage, 'monitor'); set(tab, 'scenario') }} /></Tab>
+          openStep={id => { set(stepId, id); set(stage, 'monitor'); set(tab, 'scenario') }} />{resultRun ? <Stack><Comparison language={read(language)} run={resultRun} /><WorktreeReview run={resultRun} t={t} /></Stack> : null}</Tab>
         <Tab value="metrics" label={t("Metrics")}><MetricsView /></Tab>
         <Tab value="beads" label={t("Tasks")}><TasksView /></Tab>
       </Tabs>

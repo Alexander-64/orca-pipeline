@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "agent-pipeline",
   "name": "Agent Pipeline",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Plan coding tasks in YAML or on a visual map, run them across agents, and send changes to a second agent for review. If an agent hits its quota, a fallback can pick up the work.",
   "engines": {
     "orca": ">=1.4.248"

@@ -245,3 +245,88 @@ for (const backend of ['orca', 'local'] as const) test('live monitor shows recor
   } else assert.equal(view.find({ text: 'Open codex session' }), null)
   await view.unmount()
 })
+
+test('choose a project, instantiate the three-agent template and rehearse a failed audit before launch', async () => {
+  const view = await mount(panel, { host: mockHost({ requests: { 'dashboard.get': () => demoDashboard } }) })
+  await view.toggle({ label: 'Reusable scenarios' })
+  await view.type({ label: 'focus' }, 'top-level README')
+  await view.press({ text: 'Create draft from template' })
+  const yaml = String(view.valueOf({ label: 'Scenario YAML' }))
+  assert.match(yaml, /top-level README/); assert.match(yaml, /\/tmp\/demo/)
+  await view.press({ text: 'Next: launch' })
+  await view.toggle({ label: 'Rehearse branches' })
+  await view.toggle({ label: 'Simulate failure · Audit' })
+  assert.ok(view.find({ text: /Improvements · Skipped/ }))
+  assert.ok(view.find({ text: /Independent review · Skipped/ }))
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('compare two archived reports and approve the previewed worktree digest from Results', async () => {
+  const first = structuredClone(demoRun), next = structuredClone(demoRun)
+  first.status = next.status = 'done'; next.id = 'new-run'; next.reviewBase = 'abc'
+  first.tasks.build.attempts[0].output = 'old finding'; next.tasks.build.attempts[0].output = 'verified finding'
+  const calls: unknown[] = []
+  const view = await mount(panel, { persisted: { plugin: { ...selected, 'pipeline.tab': 'result' } }, host: mockHost({ requests: {
+    'dashboard.get': () => ({ ...demoDashboard, runs: [first, next] }),
+    'run.diff': ({ id }) => ({ source: '/repo', files: ['a'], digest: 'from-' + id, patch: '+change' }),
+    'run.accept': args => { calls.push(args); return { accepted: true } }
+  } }) })
+  await view.toggle({ label: 'Compare two runs' })
+  await view.press({ text: 'Use this run as baseline' })
+  await view.select({ label: 'Run' }, next.id)
+  if (!view.find({ label: 'build · Changed' })) await view.toggle({ label: 'Compare two runs' })
+  await view.toggle({ label: 'build · Changed' })
+  assert.ok(view.find({ text: 'Added report lines' }))
+  assert.ok(view.find({ text: 'Removed report lines' }))
+  await view.toggle({ label: 'Review worktree changes' })
+  assert.equal(view.find({ text: 'Stage this patch in the source project' }), null)
+  await view.press({ text: 'Preview diff' })
+  await view.press({ text: 'Stage this patch in the source project' })
+  assert.deepEqual(calls, [{ id: next.id, digest: 'from-new-run' }])
+  assert.ok(view.find({ text: 'Changes staged in source project' }))
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('a historical handoff links both native dispatches and explains the transfer', async () => {
+  const run = structuredClone(demoRun), task = run.tasks.build
+  task.attempts[0].reason = 'quota exhausted'
+  task.attempts.push({ ...task.attempts[0], dispatchId: 'second-dispatch', agent: 'kimi', checkpointPreview: 'saved context' })
+  task.agent = 'kimi'
+  const calls: string[] = []
+  const view = await mount(panel, { persisted: { plugin: selected }, host: mockHost({ requests: {
+    'dashboard.get': () => ({ ...demoDashboard, runs: [run] }),
+    'run.open': ({ dispatchId }) => { calls.push(dispatchId!); return { opened: true } }
+  } }) })
+  await view.toggle({ label: 'Handoff · codex → kimi' })
+  assert.ok(view.find({ text: 'quota exhausted' }))
+  assert.ok(JSON.stringify(view.tree()).includes('saved context'))
+  await view.press({ text: 'Open previous session · codex' })
+  await view.press({ text: 'Open next session · kimi' })
+  assert.deepEqual(calls, [task.attempts[0].dispatchId, 'second-dispatch'])
+  await view.unmount()
+})
+
+test('saved template survives reopening the panel and uses the newly selected project', async () => {
+  const host = mockHost({ requests: { 'dashboard.get': () => ({ ...demoDashboard, workspaces: [
+    demoDashboard.workspaces[0], { ...demoDashboard.workspaces[0], id: 'jarvis', name: 'Jarvis', path: '/projects/jarvis' }
+  ] }) } })
+  const view = await mount(panel, { host })
+  await view.press({ text: 'Next: steps and agents' })
+  await view.type({ label: 'Scenario YAML' }, 'name: team-template\nobjective: "Check {{focus}} in {{project}}"\nsteps:\n - {id: audit, title: Audit, spec: "Read {{focus}}", agent: codex, acceptance: [pwd]}', { replace: true })
+  await view.press({ text: 'Back: project and task' })
+  await view.toggle({ label: 'Reusable scenarios' })
+  await view.press({ text: 'Save draft as template' })
+  const persisted = structuredClone(view.persisted)
+  await view.unmount()
+  const reopened = await mount(panel, { host, persisted })
+  await reopened.select({ label: 'Project' }, 'jarvis')
+  if (!reopened.find({ label: 'Saved template' })) await reopened.toggle({ label: 'Reusable scenarios' })
+  await reopened.select({ label: 'Saved template' }, 'team-template')
+  await reopened.type({ label: 'focus' }, 'README.md')
+  await reopened.press({ text: 'Create draft from template' })
+  assert.match(String(reopened.valueOf({ label: 'Scenario YAML' })), /Check README.md in \/projects\/jarvis/)
+  assert.deepEqual(reopened.errors, [])
+  await reopened.unmount()
+})
