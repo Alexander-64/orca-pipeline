@@ -248,7 +248,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const run = coordinator.list().find(run => run.id === id) ?? terminalBridge.get(id)
     if (!run) throw new Error(`Запуск ${id} не найден`)
     if (dispatchId) {
-      const task = Object.values(run.tasks).find(task => task.attempts.some(attempt => attempt.dispatchId === dispatchId) || task.startup?.dispatchId === dispatchId)
+      const task = Object.values(run.tasks).find(task => task.attempts.some(attempt => attempt.dispatchId === dispatchId) || task.history?.some(revision => revision.attempts.some(attempt => attempt.dispatchId === dispatchId)) || task.startup?.dispatchId === dispatchId)
       if (!task) throw new Error('Попытка не принадлежит этому запуску')
       const step = run.scenario.steps.find(step => step.id === task.stepId)
       await client.openWorker(dispatchId, step?.placement.host)

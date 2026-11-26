@@ -2,7 +2,7 @@ import { Badge, Button, Callout, Card, CodeView, Collapsible, EmptyState, Headin
 import type { PipelineRun } from './types'
 import { translate, type Language, type Message } from './i18n'
 import { diagnosticText, renderDiagnostic } from './diagnostics'
-import { STATUS } from './step-status'
+import { countRunSteps, STATUS } from './step-status'
 
 export function RunResult({ run, projectName, language, openStep, openAttempt }: {
   run?: PipelineRun; projectName: string; language: Language
@@ -12,6 +12,7 @@ export function RunResult({ run, projectName, language, openStep, openAttempt }:
   const diagnosis = (raw?: string) => diagnosticText(language, raw)
   if (!run) return <EmptyState icon="file-text" title={t("Select a saved run")} description={t("Results appear after launch. Use the run selector at the top.")} />
   const tasks = run.scenario.steps.flatMap(step => run.tasks[step.id] ? [{ step, task: run.tasks[step.id] }] : [])
+  const counts = countRunSteps(run)
   const sinks = tasks.filter(({ step }) => !run.scenario.steps.some(next => next.needs.includes(step.id)))
   return <Stack gap="md">
     <Heading level={2}>{t("Result · {0}", run.scenario.name)}</Heading>
@@ -27,16 +28,17 @@ export function RunResult({ run, projectName, language, openStep, openAttempt }:
           {attempt ? <Collapsible title={t("Attempt {0} · {1}", task.attempts.length, attempt.agent)}>
             <Text muted size="xs">{attempt.dispatchId}</Text>
             {attempt.output ? <CodeView code={attempt.output} wrap maxHeight="md" /> : <Text>{t("No output yet.")}</Text>}
-            {run.controller !== 'terminal' ? <Button onPress={() => openAttempt(attempt.dispatchId)}>{t("Open agent session")}</Button> : null}
+            {(run.controller !== 'terminal' || run.backend === 'orca') ? <Button onPress={() => openAttempt(attempt.dispatchId)}>{t("Open agent session")}</Button> : null}
           </Collapsible> : null}
           <Button size="sm" onPress={() => openStep(step.id)}>{t("Inspect step")}</Button>
         </Stack>
       </Callout>
     })}
     <Row gap="sm" wrap>
-      <Badge tone="success">{t("Finished: {0}", tasks.filter(({ task }) => task.status === 'done').length)}</Badge>
-      <Badge tone="danger">{t("Errors: {0}", tasks.filter(({ task }) => task.status === 'failed').length)}</Badge>
-      <Badge>{t("Remaining: {0}", tasks.filter(({ task }) => !['done', 'failed'].includes(task.status)).length)}</Badge>
+      <Badge tone="success">{t("Finished: {0}", counts.completed)}</Badge>
+      <Badge tone="danger">{t("Errors: {0}", counts.failed)}</Badge>
+      <Badge>{t("Remaining: {0}", counts.remaining)}</Badge>
+      {counts.skipped ? <Badge>{t("Skipped: {0}", counts.skipped)}</Badge> : null}
     </Row>
     <Text muted size="sm">{t("Created: {0} · Updated: {1}", run.createdAt, run.updatedAt)}</Text>
     {run.error ? <Callout tone="danger" title={t("Reason for stopping")}><Text>{diagnosis(run.error)}</Text></Callout> : null}

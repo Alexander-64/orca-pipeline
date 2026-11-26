@@ -126,7 +126,7 @@ export async function launchTui(initialProject: string, ensureSupervisor: (proje
       if (model.file && await readFile(model.file, 'utf8') !== model.source) throw new Error('Сценарий изменён на диске. Выполните :open')
       if (model.run && ['running', 'paused'].includes(model.run.status)) throw new Error('Текущий запуск ещё активен')
       model.run = await call({ command: 'run', source: model.source, backend: config.backend ?? 'local' }) as PipelineRun
-      setStage(model, 3); model.follow = true; return
+      setStage(model, 3); model.message = undefined; model.follow = true; return
     }
     if (['pause', 'resume', 'stop', 'retry', 'recover', 'reconcile', 'approve', 'reject', 'window'].includes(command)) {
       if (!model.run) throw new Error('Нет выбранного запуска')

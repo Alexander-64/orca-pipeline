@@ -36,7 +36,7 @@ import {
 } from 'orca'
 import { diagnosticText, renderDiagnostic } from './diagnostics'
 import { languageOf, translate, type Language, type Message } from './i18n'
-import { STATUS } from './step-status'
+import { countRunSteps, STATUS } from './step-status'
 import { RunResult } from './result-view'
 import { HistoryBrowser } from './history-view'
 import { metricsForRuns } from './metrics'
@@ -938,6 +938,7 @@ function AttemptsView({ run }: { run: PipelineRun }) {
   const step = run.scenario.steps.find((candidate) => candidate.id === id)
   if (!task || !step) return null
   const last = task.attempts.at(-1)
+  const nativeSession = run.controller !== 'terminal' || run.backend === 'orca'
   return (
     <Card title={step.title} description={step.spec}>
       <Stack gap="sm">
@@ -946,7 +947,7 @@ function AttemptsView({ run }: { run: PipelineRun }) {
           {run.controller === 'terminal' ? <Text muted>{t("Terminal run")}</Text> : null}
           {run.controller === 'terminal' && run.backend === 'local' ? <Text muted>{t("See Latest output and the pipeline terminal for results and checks.")}</Text> : last || task.startup ? <Button icon="next" onPress={() => openRun(run, task.startup?.dispatchId ?? last!.dispatchId)}>{t("Open agent session")}</Button> : <Text muted>{t("The session will appear once dependencies finish and the step starts.")}</Text>}
         </Row>
-        {last?.status === 'running' && (task.activity === 'unknown' || task.waitReason) ? <Callout tone="warning" title={t("Activity unconfirmed")}><Text>{task.waitReason ? t("Agent is waiting for a reply: {0}", task.waitReason) : run.controller === 'terminal' && run.backend === 'local' ? t("Work has not started yet or has not been confirmed. Check the executor events in the pipeline terminal.") : t("Orca accepted the task and is waiting for the agent to start. Open its session to check for an update or another prompt.")}</Text></Callout> : null}
+        {last?.status === 'running' && (task.activity === 'unknown' || task.waitReason) ? <Callout tone="warning" title={task.activity === 'unknown' ? t("Activity unconfirmed") : t("Agent status")}><Text>{task.waitReason ?? (run.controller === 'terminal' && run.backend === 'local' ? t("Work has not started yet or has not been confirmed. Check the executor events in the pipeline terminal.") : t("Orca accepted the task and is waiting for the agent to start. Open its session to check for an update or another prompt."))}</Text></Callout> : null}
         <Text size="sm">{t("Agent chain: {0}", [step.agent, ...step.fallback].join(' → '))}</Text>
         <KeyValue items={[
           { label: 'Task', value: task.taskId },
@@ -1015,18 +1016,22 @@ function AttemptsView({ run }: { run: PipelineRun }) {
               <ListItem
                 title={`${index + 1}. ${attempt.agent} · ${attempt.status}`}
                 description={`${attempt.startedAt}${attempt.reason ? ` · ${attempt.reason}` : ''}${attempt.selectionReason ? ` · ${attempt.selectionReason}` : ''}`}
-                onPress={() => openRun(run, attempt.dispatchId)}
+                onPress={nativeSession ? () => openRun(run, attempt.dispatchId) : undefined}
               />
             ))}
           </List>
         </Collapsible>
         {task.history?.map(revision => <Collapsible title={t("Previous inputs for {0}: {1}", revision.revision, revision.status)}>
-          <List>{revision.attempts.map(attempt => <ListItem title={`${attempt.agent} · ${attempt.status}`} description={attempt.artifactPath ?? attempt.dispatchId} onPress={() => openRun(run, attempt.dispatchId)} />)}</List>
+          <List>{revision.attempts.map(attempt => <ListItem title={`${attempt.agent} · ${attempt.status}`} description={attempt.artifactPath ?? attempt.dispatchId} onPress={nativeSession ? () => openRun(run, attempt.dispatchId) : undefined} />)}</List>
           {revision.attempts.at(-1)?.output ? <CodeView code={revision.attempts.at(-1)!.output!} maxHeight="md" wrap /> : null}
         </Collapsible>)}
         {last?.output ? <Collapsible title={t("Latest output")}><CodeView code={last.output} maxHeight="md" wrap /></Collapsible> : null}
         <Collapsible title="Acceptance">
-          <List>{step.acceptance.map((command) => <ListItem title={command} icon="check" />)}</List>
+          <List>{step.acceptance.map((command, index) => {
+            const check = last?.checks?.[index]
+            const recorded = check?.command === command
+            return <ListItem title={command} description={recorded ? check.exitCode === null ? t("Check outcome unknown") : t("Exit code: {0}", check.exitCode) : t("No check result recorded")} />
+          })}</List>
         </Collapsible>
       </Stack>
     </Card>
@@ -1053,6 +1058,12 @@ function RunDependencies({ run }: { run: PipelineRun }) {
       <Box gap="sm" padding="sm" border radius="md" background="muted">
         {layer.map(step => {
           const task = run.tasks[step.id]
+          const attempt = task?.attempts.at(-1)
+          const dispatch = attempt?.status === 'running' ? attempt.dispatchId : undefined
+          const unmet = step.needs.filter(id => {
+            const status = run.tasks[id]?.status
+            return status !== 'done' && !(step.join === 'all_settled' && (status === 'failed' || status === 'skipped'))
+          })
           const current = selected === step.id
           return <Box gap="xs" padding="sm" radius="sm" border={current ? 'accent' : parents.has(step.id) || children.has(step.id) ? 'accent' : true} background={current ? 'accent' : 'card'}>
             <Row gap="xs" wrap>
@@ -1062,6 +1073,14 @@ function RunDependencies({ run }: { run: PipelineRun }) {
             </Row>
             <Link onPress={() => set(stepId, step.id)}>{`${step.title} · ${task?.agent ?? step.agent}`}</Link>
             <Text muted size="xs">{t("{0} · attempts: {1}", task?.agent ?? step.agent, task?.attempts.length ?? 0)}</Text>
+            {task?.status === 'running' && task.activity && task.activityObservedAt ? <Text size="xs">{t("Last observation · {0} · {1}", task.activity, task.activityObservedAt)}</Text> : null}
+            {task?.questions?.some(question => question.state === 'waiting') ? <Text tone="warning" size="sm">{t("An agent needs your reply")}</Text> : null}
+            {unmet.length > 0 && (task?.status === 'pending' || task?.status === 'blocked') ? <Text size="xs">{t("Waiting for {0}", unmet.map(id => run.scenario.steps.find(input => input.id === id)?.title ?? id).join(', '))}</Text> : null}
+            {task?.gateId && task.status === 'blocked' ? <Text tone="warning" size="xs">{t("Decision required")}</Text> : null}
+            {task?.unconfirmedStart ? <Text tone="warning" size="sm">{t("Launch unconfirmed")}</Text> : null}
+            {task?.skipReason ? <Text muted size="xs">{diagnosis(task.skipReason)}</Text> : null}
+            {task?.status === 'running' && task.waitReason ? <Text size="xs">{task.waitReason}</Text> : null}
+            {dispatch && (run.controller !== 'terminal' || run.backend === 'orca') ? <Button size="sm" onPress={() => openRun(run, dispatch)}>{t("Open {0} session", task.agent)}</Button> : null}
             {step.needs.length ? <Stack gap="xs">
               <Text muted size="xs">{step.join === 'all_settled' ? t("↓ After all finish:") : t("↓ After all succeed:")}</Text>
               {step.needs.map(id => <Button size="sm" variant="ghost" tooltip={run.scenario.steps.find(item => item.id === id)?.title ?? id} onPress={() => set(stepId, id)}>{`#${number(id)} → #${number(step.id)} · ${run.tasks[id] ? t(STATUS[run.tasks[id].status].label) : t("Waiting")}`}</Button>)}
@@ -1080,11 +1099,7 @@ function RunsView() {
   if (!selectedRun()) return <EmptyState icon="activity" title={t("No runs yet")} description={t("Select Start run above to see steps, statuses and agent sessions here.")} />
   const run = selectedRun()!
   const tasks = run.scenario.steps.map((step) => run.tasks[step.id]).filter(Boolean)
-  const completed = tasks.filter(task => ['done', 'superseded'].includes(task.status)).length
-  const failed = tasks.filter(task => task.status === 'failed').length
-  const active = tasks.filter(task => task.status === 'running').length
-  const waiting = tasks.filter(task => ['pending', 'blocked'].includes(task.status)).length
-  const skipped = tasks.filter(task => task.status === 'skipped').length
+  const { completed, failed, active, waiting, skipped } = countRunSteps(run)
   const draftSource = read(projectDrafts)[run.sourceWorkspaceId ?? run.workspaceId] ?? read(draft)
   return (
     <Stack gap="md">

@@ -4,7 +4,7 @@
 
 Plan a multi-agent task in Orca, see which steps can run together, and follow each agent through to its result. You can start with a template, ask a planner to draft a workflow, or open an existing `.pipeline.yaml` file.
 
-**New in 0.2.1** · Find a run across projects, open the attempt behind a failed check, or resume an interrupted workflow. A standalone terminal client can run the same YAML and keep working after you detach. [Read the release notes](docs/release-0.2.1.md)
+**New in 0.3.0** · See the last observed activity on a running step, open its Orca session and identify the input that a waiting step needs. Results count skipped branches separately. [Release notes](docs/release-0.3.0.md)
 
 ![Agent Pipeline showing a recorded check in the Results view](assets/run-results.png)
 
@@ -25,10 +25,10 @@ The interface starts in English. Choose **Русский** in **English / Рус
 On Orca 1.4.263, install the versioned plugin from GitHub:
 
 ```sh
-orca plugin install Alexander-64/orca-pipeline@v0.2.1 --json
+orca plugin install Alexander-64/orca-pipeline@v0.3.0 --json
 ```
 
-Orca shows the publisher, version and requested access. Review the details, then use the approval command printed by Orca. On the minimum supported version, Orca 1.4.248, extract the plugin ZIP from the release and run `orca plugin dev load ./agent-pipeline`. [Download the release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.2.1)
+Orca shows the publisher, version and requested access. Review the details, then use the approval command printed by Orca. On the minimum supported version, Orca 1.4.248, extract the plugin ZIP from the release and run `orca plugin dev load ./agent-pipeline`. [Download the release](https://github.com/Alexander-64/orca-pipeline/releases/tag/v0.3.0)
 
 The trusted worker runs as your OS user, can open workspaces and terminals, and uses configured agent accounts. It reads the local model catalog to populate model choices. It stores run history and launch receipts in Orca plugin storage, and writes plan documents and attempt artifacts under `.agent-pipeline/` in the project. Review agent output and paths before sharing run data.
 

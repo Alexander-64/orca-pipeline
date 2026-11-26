@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // A deterministic native CLI for supervisor contract tests; no Orca connection.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 const project = dirname(fileURLToPath(import.meta.url))
 const path = join(project, 'fake-orca-state.json')
 let state
-try { state = JSON.parse(readFileSync(path, 'utf8')) } catch { state = { tasks: [], workers: [], starts: 0 } }
+try { state = JSON.parse(readFileSync(path, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw error; state = { tasks: [], workers: [], starts: 0 } }
 const args = process.argv.slice(2), flag = name => args[args.indexOf(name) + 1]
 const command = args.slice(0, 2).join(' ')
 let result = {}, error
@@ -31,6 +31,10 @@ if (command === 'orchestration worker-show') result = state.workers.find(row => 
 if (command === 'orchestration worker-read') result = { text: 'Native fixture worker report; acceptance is independent' }
 if (command === 'orchestration worker-stop') error = 'Fixture native worker has already settled; cancel the independent acceptance actor'
 if (command === 'orchestration worker-release') result = { released: true }
-writeFileSync(path, JSON.stringify(state))
+if (command === 'orchestration task-create' || command === 'orchestration worker-start') {
+  const next = path + '.' + process.pid
+  writeFileSync(next, JSON.stringify(state))
+  renameSync(next, path)
+}
 console.log(JSON.stringify({ ok: !error, ...(error ? { error: { message: error } } : { result }) }))
 if (error) process.exitCode = 1

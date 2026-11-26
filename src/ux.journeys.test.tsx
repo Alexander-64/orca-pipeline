@@ -209,3 +209,39 @@ for (const status of ['running','done'] as const) test('healthy ' + status + ' r
   assert.ok(view.find({ text: status === 'done' ? 'Run completed' : 'Partial results' }))
   await view.unmount()
 })
+
+test('a completed conditional run has no remaining work after a skip and a superseded attempt', async () => {
+  const run = structuredClone(dependencyRun)
+  run.status = 'done'
+  for (const task of Object.values(run.tasks)) task.status = 'done'
+  run.tasks.independent.status = 'skipped'
+  run.tasks.research.status = 'superseded'
+  const view = await mount(panel, { persisted: { plugin: selected }, host: mockHost({ requests: {
+    'dashboard.get': () => ({ ...demoDashboard, runs: [run] })
+  } }) })
+  assert.ok(view.find({ text: 'Skipped: 1' }))
+  await view.press({ text: 'View result' })
+  assert.ok(view.find({ text: 'Finished: 4' }))
+  assert.ok(view.find({ text: 'Remaining: 0' }))
+  assert.ok(view.find({ text: 'Skipped: 1' }))
+  await view.unmount()
+})
+
+for (const backend of ['orca', 'local'] as const) test('live monitor shows recorded acceptance activity and routes the ' + backend + ' attempt', async () => {
+  const run = structuredClone(demoRun)
+  run.controller = 'terminal'
+  run.backend = backend
+  Object.assign(run.tasks.build, { activity: 'acceptance', activityObservedAt: run.createdAt, waitReason: 'pwd' })
+  const opened: unknown[] = []
+  const view = await mount(panel, { persisted: { plugin: selected }, host: mockHost({ requests: {
+    'dashboard.get': () => ({ ...demoDashboard, runs: [run] }),
+    'run.open': input => { opened.push(input); return { opened: true } }
+  } }) })
+  assert.ok(view.find({ text: 'Last observation · acceptance · ' + run.createdAt }))
+  assert.equal(view.find({ text: /Agent is waiting for a reply: pwd/ }), null)
+  if (backend === 'orca') {
+    await view.press({ text: 'Open codex session' })
+    assert.deepEqual(opened, [{ id: run.id, dispatchId: run.tasks.build.attempts[0].dispatchId }])
+  } else assert.equal(view.find({ text: 'Open codex session' }), null)
+  await view.unmount()
+})
